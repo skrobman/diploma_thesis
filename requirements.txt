@@ -1,8 +1,9 @@
 authx==1.4.3
-fastapi==0.119.0
+fastapi==0.119.1
 mailjet_rest==1.5.1
 pydantic==2.12.3
 python-dotenv==1.1.1
 bcrypt==5.0.0
 SQLAlchemy==2.0.44
 uvicorn[standard]==0.38.0
+psycopg2-binary==2.9.11
