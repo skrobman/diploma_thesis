@@ -8,3 +8,9 @@ class UserRegisterScheme(BaseModel):
 class UserLoginScheme(BaseModel):
     email: EmailStr
     password: str
+
+class ForgotPasswordScheme(BaseModel):
+    email: EmailStr
+
+class ResetPasswordScheme(BaseModel):
+    password: str
