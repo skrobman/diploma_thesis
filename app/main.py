@@ -6,6 +6,8 @@ import os
 from app.config.auth import security
 from app.routes import user, project_route
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
 app.include_router(user.router)
 
@@ -17,6 +19,14 @@ api_key = os.getenv("MAILJET_API_KEY")
 api_secret = os.getenv("MAILJET_SECRET_KEY")
 sender_email = os.getenv("SENDER_EMAIL")
 sender_name = os.getenv("SENDER_NAME")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/protected", dependencies=[Depends(security.access_token_required)])
 def protected():
