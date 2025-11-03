@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timedelta
+
 import bcrypt
 from fastapi import HTTPException
 from pydantic import EmailStr
@@ -30,13 +31,13 @@ def register_user(db: Session, full_name: str, email: EmailStr, password: str):
     db.add(token)
     db.commit()
 
-    activation_link = f"https://diploma-thesis.onrender.com/user/activate/{token.token}"
-    activation_link2 = f"http://localhost:8000/user/activate/{token.token}"
+    activation_link = f"https://diploma-thesis.onrender.com/user/activate?token={token.token}"
+    #activation_link2 = f"http://localhost:8000/user/activate?token={token.token}"
     send_email(
         to_email=new_user.email,
         subject="Activate your account",
-        text=f"Hello! Activate your account using: {activation_link2}",
-        html=f"<p>Hello! Activate your account using: <a href='{activation_link2}'>link</a></p>"
+        text=f"Hello! Activate your account using: {activation_link}",
+        html=f"<p>Hello! Activate your account using: <a href='{activation_link}'>link</a></p>"
     )
 
     return new_user
@@ -77,7 +78,7 @@ def forgot_password_service(db: Session, email: EmailStr):
     db.add(token)
     db.commit()
 
-    activation_link = f"http://localhost:8000/reset-password/{token.token}"
+    activation_link = f"https://diploma-thesis.onrender.com/user/reset-password?token={token.token}"
     send_email(
         to_email=user.email,
         subject="Reset your password",

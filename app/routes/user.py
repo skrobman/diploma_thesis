@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Response,Depends
+from fastapi import APIRouter, Response, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.config.auth import security, config
@@ -20,9 +20,9 @@ async def login(user_data: UserLoginScheme, response: Response, db: Session = De
     response.set_cookie(config.JWT_ACCESS_COOKIE_NAME, token)
     return {"access_token": token}
 
-@router.get("/activate/{token_str}")
-def activate_account(token_str: str, db: Session = Depends(get_db)):
-    activate_user(db, token_str)
+@router.get("/activate")
+def activate_account(token: str = Query(...), db: Session = Depends(get_db)):
+    activate_user(db, token)
     return {"message": "Account successfully activated!"}
 
 @router.post("/logout", dependencies=[Depends(security.access_token_required)])
@@ -34,6 +34,6 @@ async def logout(response: Response):
 async def forgot_password(user_data: ForgotPasswordScheme, db: Session = Depends(get_db)):
     return forgot_password_service(db, user_data.email)
 
-@router.post("/reset-password/{token_str}")
-async def reset_password(user_data: ResetPasswordScheme, token_str: str, db: Session = Depends(get_db)):
+@router.post("/reset-password")
+async def reset_password(user_data: ResetPasswordScheme, token_str: str = Query(...), db: Session = Depends(get_db)):
     return reset_password_service(db, token_str, user_data.password)
