@@ -47,9 +47,11 @@ class Project(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     description = Column(Text)
+    purpose_id = Column(Integer, ForeignKey("project_purposes.id"))
 
     creator = relationship("User", back_populates="projects_created", foreign_keys=[created_by])
     members = relationship("ProjectMember", back_populates="project")
+    purpose = relationship("ProjectPurposes", back_populates="projects")
 
 
 class ProjectMember(Base):
@@ -62,7 +64,7 @@ class ProjectMember(Base):
 
     project = relationship("Project", back_populates="members")
     user = relationship("User", back_populates="memberships")
-    role = relationship("Role", back_populates="members")  # <-- Добавил связь с Role
+    role = relationship("Role", back_populates="members")
 
 
 class Role(Base):
@@ -71,3 +73,9 @@ class Role(Base):
     name = Column(String(50))
 
     members = relationship("ProjectMember", back_populates="role")
+
+class ProjectPurposes(Base):
+    __tablename__ = 'project_purposes'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), index=True)
+    projects = relationship("Project", back_populates="purpose")

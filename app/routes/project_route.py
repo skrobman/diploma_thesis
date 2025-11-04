@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import APIRouter
 from fastapi.params import Depends
 from sqlalchemy.orm import Session
@@ -24,3 +26,9 @@ def handle_create_project(
     )
 
     return new_project
+
+@router.get("/purposes", response_model=List[project_schema.PurposesRead])
+def get_project_purposes(
+        db: Session = Depends(get_db),
+):
+    return project_service.get_project_purposes(db=db)
