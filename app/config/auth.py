@@ -4,10 +4,22 @@ import os
 
 load_dotenv()
 
-config = AuthXConfig()
-config.JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default_secret")
-config.JWT_ACCESS_COOKIE_NAME = "access_token"
-config.JWT_COOKIE_CSRF_PROTECT = False
-config.JWT_TOKEN_LOCATION = ["headers"]
+DEFAULT_EXPIRES_IN_SECONDS = 604800
+expires_int = DEFAULT_EXPIRES_IN_SECONDS
+
+try:
+    expires_str = os.getenv("JWT_REFRESH_TOKEN_EXPIRES")
+
+    if expires_str is not None:
+        expires_int = int(expires_str)
+except (ValueError, TypeError):
+
+    pass
+
+config = AuthXConfig(
+    JWT_REFRESH_TOKEN_EXPIRES=expires_int,
+
+    JWT_COOKIE_CSRF_PROTECT=False
+)
 
 security = AuthX(config=config)

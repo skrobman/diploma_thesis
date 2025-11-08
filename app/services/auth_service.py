@@ -6,10 +6,27 @@ from fastapi import HTTPException
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
 
-
 from app.config.auth import security
 from app.models.models import User, ActivationToken
 from app.services.mail_service import send_email
+
+def _create_user_tokens(user: User) -> dict:
+    access_token = security.create_access_token(
+        uid=str(user.id),
+        data={"email": user.email}
+    )
+
+    # Refresh Token
+    refresh_token = security.create_refresh_token(
+        uid=str(user.id),
+        data={"email": user.email}
+    )
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
 
 def create_activation_token(user: User, purpose: str):
     token_str = str(uuid.uuid4())
@@ -52,8 +69,7 @@ def login_user(db: Session, email: EmailStr, password: str):
     if not bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
         raise HTTPException(status_code=401, detail="Incorrect password")
 
-    token = security.create_access_token(uid=str(user.id), data={"email": user.email})
-    return token
+    return _create_user_tokens(user)
 
 def activate_user(db: Session, token_str: str):
     token = db.query(ActivationToken).filter_by(token=token_str).first()
@@ -66,7 +82,8 @@ def activate_user(db: Session, token_str: str):
     user.status = 'active'
     db.delete(token)
     db.commit()
-    return user
+
+    return _create_user_tokens(user)
 
 def forgot_password_service(db: Session, email: EmailStr):
     user = db.query(User).filter_by(email = email).first()

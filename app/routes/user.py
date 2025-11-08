@@ -10,30 +10,26 @@ from app.services.auth_service import register_user, login_user, activate_user, 
 router = APIRouter(prefix="/user", tags=["user"])
 
 @router.post("/register")
-async def register(user_data: UserRegisterScheme, db: Session = Depends(get_db)):
+def register(user_data: UserRegisterScheme, db: Session = Depends(get_db)):
     user = register_user(db, user_data.full_name, user_data.email, user_data.password)
     return {"message": "User registered. Please check your email to activate your account."}
 
 @router.post("/login")
-async def login(user_data: UserLoginScheme, response: Response, db: Session = Depends(get_db)):
-    token = login_user(db, user_data.email, user_data.password)
-    response.set_cookie(config.JWT_ACCESS_COOKIE_NAME, token)
-    return {"access_token": token}
+def login(user_data: UserLoginScheme, db: Session = Depends(get_db)):
+    return login_user(db, user_data.email, user_data.password)
 
 @router.get("/activate")
 def activate_account(token: str = Query(...), db: Session = Depends(get_db)):
-    activate_user(db, token)
-    return {"message": "Account successfully activated!"}
+    return activate_user(db, token)
 
 @router.post("/logout", dependencies=[Depends(security.access_token_required)])
-async def logout(response: Response):
-    response.delete_cookie(config.JWT_ACCESS_COOKIE_NAME)
+def logout(response: Response):
     return {"message": "Successfully logged out"}
 
 @router.post("/forgot_password")
-async def forgot_password(user_data: ForgotPasswordScheme, db: Session = Depends(get_db)):
+def forgot_password(user_data: ForgotPasswordScheme, db: Session = Depends(get_db)):
     return forgot_password_service(db, user_data.email)
 
 @router.post("/reset-password")
-async def reset_password(user_data: ResetPasswordScheme, token_str: str = Query(...), db: Session = Depends(get_db)):
+def reset_password(user_data: ResetPasswordScheme, token_str: str = Query(...), db: Session = Depends(get_db)):
     return reset_password_service(db, token_str, user_data.password)
