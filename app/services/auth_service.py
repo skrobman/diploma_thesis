@@ -49,12 +49,12 @@ def register_user(db: Session, full_name: str, email: EmailStr, password: str):
     db.commit()
 
     activation_link = f"https://diploma-thesis.onrender.com/user/activate?token={token.token}"
-    activation_link2 = f"http://localhost:8000/user/activate?token={token.token}"
+    # activation_link2 = f"http://localhost:8000/user/activate?token={token.token}"
     send_email(
         to_email=new_user.email,
         subject="Activate your account",
-        text=f"Hello! Activate your account using: {activation_link2}",
-        html=f"<p>Hello! Activate your account using: <a href='{activation_link2}'>link</a></p>"
+        text=f"Hello! Activate your account using: {activation_link}",
+        html=f"<p>Hello! Activate your account using: <a href='{activation_link}'>link</a></p>"
     )
 
     return new_user
