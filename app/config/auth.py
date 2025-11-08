@@ -13,7 +13,6 @@ try:
     if expires_str is not None:
         expires_int = int(expires_str)
 except (ValueError, TypeError):
-
     pass
 
 config = AuthXConfig(
