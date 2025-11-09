@@ -9,7 +9,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     full_name = Column(String(100))
     email = Column(String(100), unique=True)
-    status = Column(String(10))
+    status = Column(String(10), server_default='inactive')
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     password_hash = Column(Text)
