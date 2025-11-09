@@ -13,7 +13,6 @@ from app.repositories.activation_token_repository import save_activation_token, 
 from app.repositories.user_repository import get_user_by_email, create_user
 from app.schemas.user_schema import UserRegisterScheme, UserLoginScheme
 from app.services.mail_service import send_email
-from app.utils.rateLimiters.rate_limiter import RateLimiter
 from app.utils.rateLimiters.rate_limiters import FORGOT_PASSWORD_LIMITER, LOGIN_LIMITER
 
 
@@ -57,8 +56,8 @@ def register_user(db: Session, data: UserRegisterScheme):
     send_email(
         to_email=new_user.email,
         subject="Activate your account",
-        text=f"Hello! Activate your account using: {activation_link2}",
-        html=f"<p>Hello! Activate your account using: <a href='{activation_link2}'>link</a></p>"
+        text=f"Hello! Activate your account using: {activation_link}",
+        html=f"<p>Hello! Activate your account using: <a href='{activation_link}'>link</a></p>"
     )
 
     return new_user
@@ -118,8 +117,8 @@ def forgot_password_service(db: Session, email: EmailStr):
     send_email(
         to_email=user.email,
         subject="Reset your password",
-        text=f"Hello! Reset your password using: {activation_link2}",
-        html=f"<p>Hello! Reset your password using: <a href='{activation_link2}'>link</a></p>"
+        text=f"Hello! Reset your password using: {activation_link}",
+        html=f"<p>Hello! Reset your password using: <a href='{activation_link}'>link</a></p>"
              f"<p>If you didn't click, just ignore the message</p>"
     )
 
