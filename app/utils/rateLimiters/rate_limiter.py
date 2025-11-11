@@ -67,3 +67,11 @@ class RateLimiter:
             return self.limit
 
         return self.limit - int(current)
+
+    def delete(self, key: str):
+
+        redis_key = f"rate:{self.prefix}:{key}"
+        time_key = f"rate_time:{self.prefix}:{key}"
+
+        redis_client.delete(redis_key)
+        redis_client.delete(time_key)

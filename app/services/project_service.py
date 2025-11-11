@@ -22,7 +22,7 @@ def create_project(
 
     if not db_purpose:
         raise HTTPException(
-            status_code=404,  # 404 Not Found или 400 Bad Request
+            status_code=404,  # 404 Not Found
             detail=f"Purpose with id {project_data_purpose_id} not found."
         )
 

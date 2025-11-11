@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, func
+from enum import UNIQUE
+
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, func, Boolean
 from sqlalchemy.types import TIMESTAMP
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -22,6 +24,8 @@ class User(Base):
         back_populates="creator",
         foreign_keys="Project.created_by"
     )
+
+    refresh_tokens = relationship("RefreshToken", back_populates="user")
 
     # Связь для ProjectMember.user
     memberships = relationship("ProjectMember", back_populates="user")
@@ -79,3 +83,17 @@ class ProjectPurposes(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(255), index=True)
     projects = relationship("Project", back_populates="purpose")
+
+class RefreshToken(Base):
+    __tablename__ = 'refresh_tokens'
+    id = Column(Integer, primary_key=True, index=True)
+    hashed_token = Column(String, nullable=False, unique=True)
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    expiry_date = Column(TIMESTAMP, nullable=False)
+    is_revoked = Column(Boolean, default=False)
+
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="refresh_tokens")

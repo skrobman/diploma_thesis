@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 
 import bcrypt
 from fastapi import HTTPException
+from jose import JWTError, jwt
 from pydantic import EmailStr
 from sqlalchemy.orm import Session
 
@@ -10,13 +11,14 @@ from app.config.auth import security
 from app.models.models import User, ActivationToken
 from app.repositories.activation_token_repository import save_activation_token, get_activation_token, \
     delete_activation_token
+from app.repositories.jwt_token_repository import save_jwt_token, verify_jwt_token, revoke_refresh_token
 from app.repositories.user_repository import get_user_by_email, create_user
 from app.schemas.user_schema import UserRegisterScheme, UserLoginScheme
 from app.services.mail_service import send_email
 from app.utils.rateLimiters.rate_limiters import FORGOT_PASSWORD_LIMITER, LOGIN_LIMITER
 
 
-def _create_user_tokens(user: User) -> dict:
+def _create_user_tokens(db: Session, user: User) -> dict:
     access_token = security.create_access_token(
         uid=str(user.id),
         data={"email": user.email}
@@ -27,6 +29,8 @@ def _create_user_tokens(user: User) -> dict:
         uid=str(user.id),
         data={"email": user.email}
     )
+
+    save_jwt_token(db, user, refresh_token)
 
     return {
         "access_token": access_token,
@@ -39,6 +43,40 @@ def create_activation_token(user: User, purpose: str):
     expiry = datetime.utcnow() + timedelta(minutes=15)
     token = ActivationToken(token=token_str, user_id=user.id, expiry_date=expiry, token_purpose=purpose)
     return token
+
+
+def refresh_token_service(db: Session, token: str):
+    verify_jwt_token(db, token)
+
+    try:
+        SECRET_KEY = security.config.JWT_SECRET_KEY
+        ALGORITHM = "HS256"
+
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        token_type = payload.get("type")
+        if token_type != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type, expected 'refresh'")
+
+    except JWTError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=f"Invalid token: {e}"
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    tokens = _create_user_tokens(db, user)
+
+    revoke_refresh_token(db, token)
+
+    return tokens
 
 def register_user(db: Session, data: UserRegisterScheme):
     if get_user_by_email(db, data.email):
@@ -69,19 +107,19 @@ def login_user(db: Session, data: UserLoginScheme):
     if user.status != "active":
         raise HTTPException(status_code=403, detail="Account not activated")
 
-    if not LOGIN_LIMITER.is_allowed(data.email):
-        raise HTTPException(
-            status_code=429,
-            detail=f"Too many failed login attempts. Try again later."
-        )
-
     if not bcrypt.checkpw(data.password.encode('utf-8'), user.password_hash.encode('utf-8')):
-        LOGIN_LIMITER.incr(data.email)
+        # проверяем, достигнут ли лимит после увеличения
+        if not LOGIN_LIMITER.is_allowed(data.email):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many failed login attempts. Try again later."
+            )
+
         raise HTTPException(status_code=401, detail="Incorrect password")
 
-    LOGIN_LIMITER.delete(f"rate:login_failed:{data.email}")
+    LOGIN_LIMITER.delete(data.email)
 
-    return _create_user_tokens(user)
+    return _create_user_tokens(db, user)
 
 def activate_user(db: Session, token_str: str):
     token = get_activation_token(db, token_str, 'activation_token')
@@ -94,7 +132,7 @@ def activate_user(db: Session, token_str: str):
     user.status = 'active'
     delete_activation_token(db, token)
 
-    return _create_user_tokens(user)
+    return _create_user_tokens(db,user)
 
 def forgot_password_service(db: Session, email: EmailStr):
     if not FORGOT_PASSWORD_LIMITER.is_allowed(str(email)):
@@ -137,3 +175,10 @@ def reset_password_service(db: Session, token_str: str, new_password: str):
     delete_activation_token(db, token)
 
     return {"message": "Password reset successfully"}
+
+def logout_service(db: Session, token_str: str):
+    verify_jwt_token(db, token_str)
+
+    revoke_refresh_token(db, token_str)
+
+    return {"message": "Successfully logged out"}
