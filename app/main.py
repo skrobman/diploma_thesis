@@ -8,6 +8,10 @@ from app.routes import user, project_route
 
 from fastapi.middleware.cors import CORSMiddleware
 
+import logging
+import logging.config
+import sys
+
 app = FastAPI()
 app.include_router(user.router)
 
@@ -28,9 +32,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/protected", dependencies=[Depends(security.access_token_required)])
-def protected():
-    return {"message": "Hello World"}
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,  # Оставляем логгеры uvicorn и FastAPI
+
+    # Форматтеры: как будет выглядеть строка лога
+    "formatters": {
+        "default": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            # Пример: 2025-11-11 20:10:05,123 - app.services.auth_service - ERROR - Database timeout
+        },
+    },
+
+    # Обработчики: куда отправлять логи
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",  # Вывод в "поток" (консоль)
+            "formatter": "default",  # Используем наш форматтер "default"
+            "stream": sys.stdout,  # Конкретно - в stdout (стандартный вывод)
+        },
+    },
+
+    # Логгеры: какие логгеры как настроить
+    "root": {  # "Корневой" логгер (по умолчанию для ВСЕХ)
+        "level": "INFO",  # Минимальный уровень для вывода (DEBUG, INFO, WARNING, ERROR)
+        "handlers": ["console"],  # Куда отправлять: на 'console'
+    },
+}
+
+# 2. Применяем конфигурацию
+logging.config.dictConfig(LOGGING_CONFIG)
 
 @app.exception_handler(AuthXException)
 async def authx_exception_handler(request: Request, exc: AuthXException):

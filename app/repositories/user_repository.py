@@ -1,12 +1,18 @@
 from pydantic import EmailStr
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import User
 
-def get_user_by_email(db: Session, email: EmailStr):
-    return db.query(User).filter(User.email == email).first()
+async def get_user_by_email(db: AsyncSession, email: EmailStr):
+    result = await db.execute(select(User).where(User.email == email))
+    return result.scalars().first()
 
-def create_user(db: Session, full_name: str, email: EmailStr, password: str):
+async def get_user_by_id(db: AsyncSession, user_id: int):
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalars().first()
+
+async def create_user(db: AsyncSession, full_name: str, email: EmailStr, password: str):
     user = User(
         full_name=full_name,
         email=str(email),
@@ -14,6 +20,6 @@ def create_user(db: Session, full_name: str, email: EmailStr, password: str):
     )
 
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     return user

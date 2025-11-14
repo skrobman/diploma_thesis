@@ -1,7 +1,8 @@
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.config.auth import security
@@ -9,9 +10,9 @@ from app.models.models import User
 
 securityCred = HTTPBearer()
 
-def get_current_user(
+async def get_current_user(
         credentials: HTTPAuthorizationCredentials = Depends(securityCred),
-        db: Session = Depends(get_db)
+        db: AsyncSession = Depends(get_db)
 ) -> User:
     token = credentials.credentials
 
@@ -22,6 +23,13 @@ def get_current_user(
         ALGORITHM = "HS256"
         #Декодируем токен
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        token_type = payload.get("type")
+        if token_type != "access":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type, 'access' token required"
+            )
 
     except JWTError:
         raise HTTPException(
@@ -34,7 +42,12 @@ def get_current_user(
     if not user_id:
         raise HTTPException(status_code=401, detail="Token missing user ID")
 
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    stmt = select(User).where(
+        User.id == int(user_id)
+    )
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 

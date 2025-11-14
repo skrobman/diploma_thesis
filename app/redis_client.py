@@ -1,4 +1,4 @@
-import redis
+import redis.asyncio as redis
 
 from app.config.config import settings
 

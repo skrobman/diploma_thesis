@@ -2,12 +2,10 @@ import traceback
 
 from fastapi import APIRouter, Depends, Query, HTTPException, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.auth import security
-from app.config.dependencies import get_current_user
 from app.database import get_db
-from app.models.models import User
 from app.schemas.jwt_token_schema import LogoutRequest
 from app.schemas.user_schema import UserLoginScheme, UserRegisterScheme, ForgotPasswordScheme, ResetPasswordScheme
 from app.services.auth_service import register_user, login_user, activate_user, forgot_password_service, \
@@ -17,39 +15,35 @@ router = APIRouter(prefix="/user", tags=["user"])
 securityCred = HTTPBearer()
 
 @router.post("/register")
-def register(user_data: UserRegisterScheme, db: Session = Depends(get_db)):
-    try:
-        register_user(db, user_data)
-    except Exception as e:
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
+async def register(user_data: UserRegisterScheme, db: AsyncSession = Depends(get_db)):
+    await register_user(db, user_data)
 
     return {"message": "User registered. Please check your email to activate your account."}
 
 @router.post("/login")
-def login(user_data: UserLoginScheme, db: Session = Depends(get_db)):
-    return login_user(db, user_data)
+async def login(user_data: UserLoginScheme, db: AsyncSession = Depends(get_db)):
+    return await login_user(db, user_data)
 
 @router.get("/activate")
-def activate_account(token: str = Query(...), db: Session = Depends(get_db)):
-    return activate_user(db, token)
+async def activate_account(token: str = Query(...), db: AsyncSession = Depends(get_db)):
+    return await activate_user(db, token)
 
 @router.post("/logout", dependencies=[Depends(security.access_token_required)])
-def logout(data: LogoutRequest, db: Session = Depends(get_db)):
-    return logout_service(db, data.refresh_token)
+async def logout(data: LogoutRequest, db: AsyncSession = Depends(get_db)):
+    return await logout_service(db, data.refresh_token)
 
 @router.post("/forgot_password")
-def forgot_password(user_data: ForgotPasswordScheme, db: Session = Depends(get_db)):
-    return forgot_password_service(db, user_data.email)
+async def forgot_password(user_data: ForgotPasswordScheme, db: AsyncSession = Depends(get_db)):
+    return await forgot_password_service(db, user_data.email)
 
 @router.post("/reset-password")
-def reset_password(user_data: ResetPasswordScheme, token_str: str = Query(...), db: Session = Depends(get_db)):
-    return reset_password_service(db, token_str, user_data.password)
+async def reset_password(user_data: ResetPasswordScheme, token_str: str = Query(...), db: AsyncSession = Depends(get_db)):
+    return await reset_password_service(db, token_str, user_data.password)
 
 @router.post("/refresh-token")
-def refresh_token_route(
+async def refresh_token_route(
     credentials: HTTPAuthorizationCredentials = Depends(securityCred),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     token = credentials.credentials
-    return refresh_token_service(db, token)
+    return await refresh_token_service(db, token)

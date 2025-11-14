@@ -1,3 +1,4 @@
+import asyncio
 import os
 from mailjet_rest import Client
 
@@ -9,7 +10,7 @@ sender_name = os.getenv("SENDER_NAME")
 
 mailjet = Client(auth=(api_key, api_secret), version='v3.1')
 
-def send_email(to_email: str, subject: str, text: str, html: str):
+async def send_email(to_email: str, subject: str, text: str, html: str):
     data = {
         'Messages': [
             {
@@ -21,5 +22,5 @@ def send_email(to_email: str, subject: str, text: str, html: str):
             }
         ]
     }
-    result = mailjet.send.create(data=data)
+    result = await asyncio.to_thread(mailjet.send.create, data=data)
     return result.status_code
