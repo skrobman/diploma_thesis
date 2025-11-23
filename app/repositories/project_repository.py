@@ -1,8 +1,9 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models import models
-from app.models.models import ProjectMember, Project
+from app.models.models import ProjectMember, Project, User
 from app.schemas.project_schema import AddProjectMember
 
 async def get_project_purpose(db: AsyncSession, purpose_id: int):
@@ -60,3 +61,39 @@ async def add_member_to_project(db:AsyncSession, schema: AddProjectMember):
     await db.flush()
 
     return project_member
+
+async def get_all_projects(
+        db: AsyncSession,
+        user_id: int,
+        cursor: int
+):
+    stmt = (
+        select(Project)
+        .join(
+            ProjectMember,
+            ProjectMember.project_id == Project.id
+        )
+        .where(
+            Project.id > cursor,
+            ProjectMember.user_id == user_id,
+        )
+        .order_by(Project.id.asc())
+        .limit(5)
+        .options(selectinload(Project.members))
+    )
+
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+async def get_total_of_projects(
+        db: AsyncSession,
+        user_id: int,
+):
+    stmt = (
+        select(func.count(Project.id))
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .where(ProjectMember.user_id == user_id)
+    )
+
+    total_projects = (await db.execute(stmt)).scalar_one()
+    return total_projects

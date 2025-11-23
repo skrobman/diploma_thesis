@@ -5,17 +5,21 @@ import string
 from typing import List
 
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import update
 
+from app.redis_client import redis_client
 from app.models import models
 from app.models.models import ProjectInvitationTokens, User
 from app.repositories.invitation_token_repository import save_invitation_token, get_invitation_token, \
     delete_invitation_token
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
-    get_all_project_purposes_repository, add_member_to_project, get_project_by_id
+    get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
+    get_all_projects
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
-from app.schemas.project_schema import CreateProject, AddProjectMember
+from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse
 from app.services.mail_service import send_email
 from app.utils.error_handler import handle_db_errors
 
@@ -26,6 +30,20 @@ def generate_token(length=6):
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+async def invalidate_user_projects_cache(user_id: int):
+    """
+    Удаляет весь кэш проектов для конкретного пользователя.
+    Вызывается при создании, удалении или изменении проектов.
+    """
+    # Шаблон поиска всех страниц кэша этого юзера
+    pattern = f"projects:user:{user_id}:*"
+
+    # Получаем список ключей,
+    keys = await redis_client.keys(pattern)
+
+    if keys:
+        await redis_client.delete(*keys)
 
 @handle_db_errors
 async def create_project(
@@ -101,7 +119,15 @@ async def create_project(
                 html=f"<p>Code: <b>{raw_token}</b>. <a href='{activation_link}'>Link</a></p>"
             )
 
+        await db.execute(
+            update(models.Project)
+            .where(models.Project == db_project.id)
+            .values(updated_at=func.now())
+        )
+
         await db.commit()
+
+        await invalidate_user_projects_cache(user_id)
 
     except Exception as e:
         await db.rollback()
@@ -148,6 +174,8 @@ async def join_to_project(
 
     await delete_invitation_token(db, token)
 
+    await invalidate_user_projects_cache(current_user.id)
+
     return {"message": "user joined"}
 
 async def get_project_purposes(
@@ -156,3 +184,45 @@ async def get_project_purposes(
     return list(
         await get_all_project_purposes_repository(db)
     )
+
+async def get_user_projects(
+        db: AsyncSession,
+        user_id: int,
+        cursor: int = 0,
+        limit: int = 5
+) -> AllProjectsResponse:
+    cache_key = f"projects:user:{user_id}:cursor:{cursor}:limit:{limit}"
+
+    cached_data = await redis_client.get(cache_key)
+
+    if cached_data:
+        return AllProjectsResponse.model_validate_json(cached_data)
+
+    projects_list, total_count = await asyncio.gather(
+        get_all_projects(db, user_id, cursor),
+        get_total_of_projects(db, user_id)
+    )
+
+    next_cursor = None
+
+    if projects_list:
+        last_project = projects_list[-1]
+        next_cursor = last_project.id
+
+        if len(projects_list) < limit:
+            next_cursor = None
+
+
+    response = AllProjectsResponse(
+        items=projects_list,
+        total=total_count,
+        next_cursor=next_cursor
+    )
+
+    await redis_client.set(
+        cache_key,
+        response.model_dump_json(),
+        ex=600
+    )
+
+    return response

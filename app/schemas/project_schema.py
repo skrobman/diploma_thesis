@@ -1,24 +1,38 @@
 from datetime import datetime
+from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, computed_field
 
 from app.schemas.user_schema import UserRead
+from app.utils.date_utils import time_ago
+
 
 class CreateProject(BaseModel):
     name: str
     purpose_id: int
     description: str
-    users: list[EmailStr]
+    users: list[EmailStr] = []
 
 class ProjectRead(BaseModel):
     name: str
     description: str
     created_at: datetime
+    updated_at: datetime
 
     creator: UserRead
 
+    @computed_field
+    def last_activity(self) -> str:
+        return time_ago(self.updated_at)
+
+
     class Config:
         from_attributes = True
+
+class AllProjectsResponse(BaseModel):
+    items: List[ProjectRead]
+    total: int
+    next_cursor: Optional[int] = None
 
 class PurposesRead(BaseModel):
     id: int

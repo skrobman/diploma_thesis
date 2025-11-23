@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, Query
 from fastapi.params import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,10 +8,10 @@ from app.database import get_db
 from app.config.dependencies import get_current_user
 from app.schemas import project_schema
 from app.models.models import User
-from app.schemas.project_schema import JoinProjectRequest
+from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse
 
 from app.services import project_service
-from app.services.project_service import join_to_project
+from app.services.project_service import join_to_project, get_user_projects
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -61,4 +61,19 @@ async def join_project_manual(
         db=db,
         token_str=data.token,
         current_user=current_user
+    )
+
+@router.get("/", response_model=AllProjectsResponse)
+async def get_projects(
+        cursor: int = Query(0, description="ID последнего проекта с предыдущей страницы"),
+        limit: int = Query(5, le=10, description="Количество проектов на странице"),
+
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    return await get_user_projects(
+        db=db,
+        user_id=current_user.id,
+        cursor=cursor,
+        limit=limit
     )
