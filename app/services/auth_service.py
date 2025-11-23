@@ -85,12 +85,15 @@ async def refresh_token_service(db: AsyncSession, token: str):
 
 @handle_db_errors
 async def register_user(db: AsyncSession, data: UserRegisterScheme):
-    if await get_user_by_email(db, data.email):
-        raise HTTPException(status_code=400, detail="Account already exists")
+    # if await get_user_by_email(db, data.email):
+    #     raise HTTPException(status_code=400, detail="Account already exists")
 
     password_hash = bcrypt.hashpw(data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-    new_user = await create_user(db, data.full_name, data.email, password_hash)
+    try:
+        new_user = await create_user(db, data.full_name, data.email, password_hash)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     token = create_activation_token(new_user, "activation_token")
     await save_activation_token(db, token)

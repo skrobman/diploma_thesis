@@ -1,5 +1,3 @@
-from enum import UNIQUE
-
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, func, Boolean
 from sqlalchemy.types import TIMESTAMP
 from sqlalchemy.orm import declarative_base, relationship
@@ -16,9 +14,6 @@ class User(Base):
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     password_hash = Column(Text)
 
-    # --- Связи ---
-    tokens = relationship("ActivationToken", back_populates="user")
-
     projects_created = relationship(
         "Project",
         back_populates="creator",
@@ -30,6 +25,9 @@ class User(Base):
     # Связь для ProjectMember.user
     memberships = relationship("ProjectMember", back_populates="user")
 
+    activation_tokens = relationship("ActivationToken", back_populates="user")
+
+    invitations = relationship("ProjectInvitationTokens", back_populates="user")
 
 class ActivationToken(Base):
     __tablename__ = 'activation_tokens'
@@ -41,7 +39,7 @@ class ActivationToken(Base):
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
     token_purpose = Column(Text)
 
-    user = relationship("User", back_populates="tokens")
+    user = relationship("User", back_populates="activation_tokens")
 
 class Project(Base):
     __tablename__ = 'projects'
@@ -56,7 +54,7 @@ class Project(Base):
     creator = relationship("User", back_populates="projects_created", foreign_keys=[created_by])
     members = relationship("ProjectMember", back_populates="project")
     purpose = relationship("ProjectPurposes", back_populates="projects")
-
+    invitation_tokens = relationship("ProjectInvitationTokens", back_populates="project")
 
 class ProjectMember(Base):
     __tablename__ = 'project_members'
@@ -97,3 +95,17 @@ class RefreshToken(Base):
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="refresh_tokens")
+
+class ProjectInvitationTokens(Base):
+    __tablename__ = 'project_invitations_tokens'
+    id = Column(Integer, primary_key=True)
+    hashed_token = Column(String, nullable=False, unique=True)
+
+    project_id = Column(Integer, ForeignKey('projects.id'))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    project = relationship("Project", back_populates="invitation_tokens")
+    user = relationship("User", back_populates="invitations")

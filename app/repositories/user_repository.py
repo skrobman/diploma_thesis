@@ -1,5 +1,6 @@
 from pydantic import EmailStr
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import User
@@ -19,7 +20,14 @@ async def create_user(db: AsyncSession, full_name: str, email: EmailStr, passwor
         password_hash=password
     )
 
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    async with db.begin():
+        db.add(user)
+        try:
+            await db.flush()
+        except IntegrityError:
+            await db.rollback()
+            raise ValueError("User with this email already exists")
+
+        await db.refresh(user)
+
     return user

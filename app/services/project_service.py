@@ -1,71 +1,158 @@
+import asyncio
+import hashlib
+import secrets
+import string
 from typing import List
 
 from fastapi import HTTPException
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import models
+from app.models.models import ProjectInvitationTokens, User
+from app.repositories.invitation_token_repository import save_invitation_token, get_invitation_token, \
+    delete_invitation_token
+from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
+    get_all_project_purposes_repository, add_member_to_project, get_project_by_id
+from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
-from app.schemas.project_schema import CreateProject
+from app.schemas.project_schema import CreateProject, AddProjectMember
+from app.services.mail_service import send_email
+from app.utils.error_handler import handle_db_errors
 
+
+def generate_token(length=6):
+    alphabet = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+@handle_db_errors
 async def create_project(
         db: AsyncSession,
         project_data: CreateProject,
         user_id: int
 ) -> models.Project:
-    #Создаем проект
     project_data_dict = project_data.model_dump()
-
     project_data_name = project_data_dict.get('name')
-
     project_data_purpose_id = project_data_dict.get('purpose_id')
+    project_data_users = project_data_dict.pop('users')
 
-    stmt = select(models.ProjectPurposes).where(models.ProjectPurposes.id == project_data_purpose_id)
-    result = await db.execute(stmt)
-    db_purpose = result.scalars().first()
-
-    #db_purpose = db.query(models.ProjectPurposes).filter(models.ProjectPurposes.id == project_data_purpose_id).first()
-
+    db_purpose = await get_project_purpose(db, project_data_purpose_id)
     if not db_purpose:
-        raise HTTPException(
-            status_code=404,  # 404 Not Found
-            detail=f"Purpose with id {project_data_purpose_id} not found."
-        )
+        raise HTTPException(status_code=404, detail=f"Purpose not found.")
 
-    #Проверка на существующий проект(Содержит имя и его создал один и тот же пользователь)
-    # existing_project = db.query(models.Project).filter_by(
-    #         name=project_data_name,
-    #         created_by=user_id
-    #     ).first()
-
-    project_stmt = select(models.Project).where(
-        models.Project.name == project_data_name,
-        models.Project.created_by == user_id
-    )
-    project_result = await db.execute(project_stmt)
-    existing_project = project_result.scalars().first()
-
+    existing_project = await check_existing_project(db, user_id, project_data_name)
     if existing_project:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Project {project_data_name} already exists."
+        raise HTTPException(status_code=409, detail=f"Project exists.")
+
+    project_creator = await get_user_by_id(db, user_id)
+    if project_creator.email in project_data_users:
+        raise HTTPException(status_code=400, detail="Cannot invite yourself.")
+
+    # Находим юзеров и сохраняем их в список
+    users_to_invite = []
+    for user_email in list(set(project_data_users)):
+        existing_user = await get_user_by_email(db, user_email)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail=f"User {user_email} not found.")
+        users_to_invite.append(existing_user)
+
+    try:
+        #Создаем проект
+        db_project = models.Project(
+            **project_data_dict,
+            created_by=user_id
         )
+        await create_project_repository(db, db_project)
 
-    db_project = models.Project(
-        **project_data_dict,
-        created_by=user_id
-    )
+        #Добавляем владельца
+        member_schema = AddProjectMember(
+            project_id=db_project.id,
+            user_id=db_project.created_by,
+            role_id=1
+        )
+        await add_member_to_project(db, member_schema)
 
-    db.add(db_project)
-    await db.commit()
-    await db.refresh(db_project)
+        #Создаем приглашения для пользователей
+        for user_obj in users_to_invite:
+            #Генерируем чистый токен (для письма)
+            raw_token = await asyncio.to_thread(generate_token)
+
+            #Хэшируем токен
+            hashed_token = await asyncio.to_thread(hash_token, raw_token)
+
+            #Создаем объект модели
+            invitation_model = ProjectInvitationTokens(
+                hashed_token=hashed_token,
+                project_id=db_project.id,
+                user_id=user_obj.id
+            )
+
+            await save_invitation_token(db, invitation_model)
+
+            #Отправляем письмо
+            activation_link = f"http://localhost:8000/projects/invite/{raw_token}"
+
+            await send_email(
+                to_email=user_obj.email,
+                subject=f"{project_creator.full_name} invites you to project",
+                text=f"Code: {raw_token}. Link: {activation_link}",
+                html=f"<p>Code: <b>{raw_token}</b>. <a href='{activation_link}'>Link</a></p>"
+            )
+
+        await db.commit()
+
+    except Exception as e:
+        await db.rollback()
+        raise e
 
     return db_project
+
+@handle_db_errors
+async def join_to_project(
+        db: AsyncSession,
+        token_str: str,
+        current_user: User
+):
+    hashed_token = hash_token(token_str)
+    token = await get_invitation_token(db, hashed_token)
+
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid token"
+        )
+
+    #project = await get_project_by_id(db, token.project_id)
+
+    user = await get_user_by_id(db, token.user_id)
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    if user.id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="This invitation is not intended for your account."
+        )
+
+    member_schema = AddProjectMember(
+        project_id=token.project_id,
+        user_id=user.id,
+        role_id=3
+    )
+    await add_member_to_project(db, member_schema)
+
+    await delete_invitation_token(db, token)
+
+    return {"message": "user joined"}
 
 async def get_project_purposes(
         db: AsyncSession
 ) -> List[models.ProjectPurposes]:
-    stmt = select(models.ProjectPurposes)
-    result = await db.execute(stmt)
-    return list(result.scalars().all())
-    # return db.query(models.ProjectPurposes).all()
+    return list(
+        await get_all_project_purposes_repository(db)
+    )
