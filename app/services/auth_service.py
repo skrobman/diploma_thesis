@@ -104,8 +104,8 @@ async def register_user(db: AsyncSession, data: UserRegisterScheme):
         await send_email(
             to_email=new_user.email,
             subject="Activate your account",
-            text=f"Hello! Activate your account using: {activation_link2}",
-            html=f"<p>Hello! Activate your account using: <a href='{activation_link2}'>link</a></p>"
+            text=f"Hello! Activate your account using: {activation_link}",
+            html=f"<p>Hello! Activate your account using: <a href='{activation_link}'>link</a></p>"
         )
     except HTTPException as e:
         raise e
@@ -180,8 +180,8 @@ async def forgot_password_service(db: AsyncSession, email: EmailStr):
         await send_email(
             to_email=user.email,
             subject="Reset your password",
-            text=f"Hello! Reset your password using: {activation_link2}",
-            html=f"<p>Hello! Reset your password using: <a href='{activation_link2}'>link</a></p>"
+            text=f"Hello! Reset your password using: {activation_link}",
+            html=f"<p>Hello! Reset your password using: <a href='{activation_link}'>link</a></p>"
                  f"<p>If you didn't click, just ignore the message</p>"
         )
     except HTTPException as e:

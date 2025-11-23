@@ -110,7 +110,8 @@ async def create_project(
             await save_invitation_token(db, invitation_model)
 
             #Отправляем письмо
-            activation_link = f"http://localhost:8000/projects/invite/{raw_token}"
+            activation_link = f"https://diploma-thesis.onrender.com/projects/invite/{raw_token}"
+            activation_link2 = f"http://localhost:8000/projects/invite/{raw_token}"
 
             await send_email(
                 to_email=user_obj.email,
