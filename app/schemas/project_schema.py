@@ -13,13 +13,21 @@ class CreateProject(BaseModel):
     description: str
     users: list[EmailStr] = []
 
+class ProjectMemberRead(BaseModel):
+    role_id: int
+    user: UserRead
+
+    class Config:
+        from_attributes = True
+
 class ProjectRead(BaseModel):
+    id: int
     name: str
     description: str
     created_at: datetime
     updated_at: datetime
 
-    creator: UserRead
+    members: list[ProjectMemberRead] = []
 
     @computed_field
     def last_activity(self) -> str:
