@@ -8,7 +8,7 @@ from app.database import get_db
 from app.config.dependencies import get_current_user
 from app.schemas import project_schema
 from app.models.models import User
-from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse
+from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, ProjectRead
 
 from app.services import project_service
 from app.services.project_service import join_to_project, get_user_projects
@@ -76,4 +76,19 @@ async def get_projects(
         user_id=current_user.id,
         cursor=cursor,
         limit=limit
+    )
+
+@router.get(
+    "/{project_id}",
+    response_model=ProjectRead
+)
+async def get_project(
+        project_id: int,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    return await project_service.get_project_by_id_service(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id
     )

@@ -16,10 +16,10 @@ from app.repositories.invitation_token_repository import save_invitation_token, 
     delete_invitation_token
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
-    get_all_projects
+    get_all_projects, is_user_member_of_project
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
-from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse
+from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead
 from app.services.mail_service import send_email
 from app.utils.error_handler import handle_db_errors
 
@@ -129,11 +129,14 @@ async def create_project(
 
         await invalidate_user_projects_cache(user_id)
 
+        full_project = await get_project_by_id(db, db_project.id)
+
+        return full_project
+
     except Exception as e:
         await db.rollback()
         raise e
 
-    return db_project
 
 @handle_db_errors
 async def join_to_project(
@@ -219,10 +222,51 @@ async def get_user_projects(
         next_cursor=next_cursor
     )
 
+    json_to_cache = response.model_dump_json(
+        exclude={
+            'items': {'__all__': {'last_activity'}}
+        }
+    )
+
     await redis_client.set(
         cache_key,
-        response.model_dump_json(),
+        json_to_cache,
         ex=600
     )
 
     return response
+
+async def get_project_by_id_service(
+        db: AsyncSession,
+        project_id: int,
+        user_id: int,
+) -> ProjectRead:
+    is_member = await is_user_member_of_project(db, user_id, project_id)
+
+    if not is_member:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    cache_key = f"project_id:{project_id}"
+
+    cached_data = await redis_client.get(cache_key)
+
+    if cached_data:
+        return ProjectRead.model_validate_json(cached_data)
+
+    project = await get_project_by_id(db, project_id)
+
+    project_dto = ProjectRead.model_validate(project)
+
+    json_to_cache = project_dto.model_dump_json(
+        exclude={
+            'items': {'__all__': {'last_activity'}}
+        }
+    )
+
+    await redis_client.set(
+        cache_key,
+        json_to_cache,
+        ex=600
+    )
+
+    return project

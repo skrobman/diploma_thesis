@@ -1,10 +1,18 @@
-from sqlalchemy import select, func
+from sqlalchemy import select, func, exists
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import models
 from app.models.models import ProjectMember, Project, User
 from app.schemas.project_schema import AddProjectMember
+
+async def is_user_member_of_project(db: AsyncSession, user_id: int, project_id: int) -> bool:
+    stmt = select(exists().where(
+        models.ProjectMember.user_id == user_id,
+        models.ProjectMember.project_id == project_id
+    ))
+    result = await db.execute(stmt)
+    return result.scalar()
 
 async def get_project_purpose(db: AsyncSession, purpose_id: int):
     result = await db.execute(
@@ -20,6 +28,9 @@ async def get_project_by_id(
 ):
     project_stmt = select(models.Project).where(
         models.Project.id == project_id
+    ).options(
+            # Подгружаем участников и внутри них - пользователей
+            selectinload(models.Project.members).selectinload(models.ProjectMember.user)
     )
 
     result = await db.execute(project_stmt)
@@ -79,7 +90,10 @@ async def get_all_projects(
         )
         .order_by(Project.id.asc())
         .limit(5)
-        .options(selectinload(Project.members))
+        .options(
+            selectinload(Project.members)
+            .selectinload(ProjectMember.user)
+        )
     )
 
     result = await db.execute(stmt)
