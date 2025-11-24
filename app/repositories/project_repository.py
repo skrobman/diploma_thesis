@@ -4,7 +4,8 @@ from sqlalchemy.orm import selectinload
 
 from app.models import models
 from app.models.models import ProjectMember, Project, User
-from app.schemas.project_schema import AddProjectMember
+from app.schemas.project_schema import AddProjectMember, UpdateProject
+
 
 async def is_user_member_of_project(db: AsyncSession, user_id: int, project_id: int) -> bool:
     stmt = select(exists().where(
@@ -111,3 +112,19 @@ async def get_total_of_projects(
 
     total_projects = (await db.execute(stmt)).scalar_one()
     return total_projects
+
+async def update_project_repository(
+        db: AsyncSession,
+        project: models.Project,
+        update_data: dict
+) -> models.Project:
+    for key, value in update_data.items():
+        setattr(project, key, value)
+
+    db.add(project)
+
+    await db.flush()
+
+    await db.refresh(project)
+
+    return project

@@ -56,3 +56,7 @@ class AddProjectMember(BaseModel):
 
 class JoinProjectRequest(BaseModel):
     token: str
+
+class UpdateProject(BaseModel):
+    name: str | None = None
+    description: str | None = None
