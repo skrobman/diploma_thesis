@@ -49,6 +49,13 @@ class PurposesRead(BaseModel):
     class Config:
         from_attributes = True
 
+class RolesRead(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
 class AddProjectMember(BaseModel):
     project_id: int
     user_id: int

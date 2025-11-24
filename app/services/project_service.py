@@ -16,7 +16,7 @@ from app.repositories.invitation_token_repository import save_invitation_token, 
     delete_invitation_token
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
-    get_all_projects, is_user_member_of_project, update_project_repository
+    get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject
@@ -188,6 +188,13 @@ async def get_project_purposes(
         await get_all_project_purposes_repository(db)
     )
 
+async def get_project_roles(
+        db: AsyncSession
+) -> List[models.Role]:
+    return list(
+        await get_all_project_roles_repository(db)
+    )
+
 async def get_user_projects(
         db: AsyncSession,
         user_id: int,
@@ -284,6 +291,12 @@ async def update_project_service(
 
     if project.created_by != user_id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    new_name = update_schema.name
+    if new_name and new_name != project.name:
+        duplicate = await check_existing_project(db, user_id, new_name)
+        if duplicate:
+            raise HTTPException(status_code=409, detail="Project name already taken")
 
     update_data = update_schema.model_dump(exclude_unset=True)
 
