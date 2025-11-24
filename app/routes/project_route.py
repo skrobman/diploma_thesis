@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, status, Query
+from fastapi import APIRouter, status, Query, HTTPException
 from fastapi.params import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.functions import current_user
@@ -9,10 +9,11 @@ from app.database import get_db
 from app.config.dependencies import get_current_user
 from app.schemas import project_schema
 from app.models.models import User
-from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, ProjectRead, UpdateProject
+from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, ProjectRead
 
 from app.services import project_service
 from app.services.project_service import join_to_project, get_user_projects, update_project_service
+from app.utils.rateLimiters.rate_limiters import PROJECT_UPDATE_LIMITER, PROJECT_READ_LIMITER, PROJECT_CREATE_LIMITER
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -26,6 +27,9 @@ async def handle_create_project(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    if not await PROJECT_CREATE_LIMITER.is_allowed(str(current_user.id)):
+        raise HTTPException(status_code=429, detail="Too many requests, try again later")
+
     new_project = await project_service.create_project(
         db=db,
         project_data=project_to_create,
@@ -39,6 +43,12 @@ async def get_project_purposes(
         db: AsyncSession = Depends(get_db),
 ):
     return await project_service.get_project_purposes(db=db)
+
+@router.get("/roles", response_model=List[project_schema.RolesRead])
+async def get_project_roles(
+        db: AsyncSession = Depends(get_db),
+):
+    return await project_service.get_project_roles(db=db)
 
 @router.get("/invite/{token}")
 async def accept_invite_link(
@@ -72,6 +82,10 @@ async def get_projects(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    # Защита от Ddos
+    if not await PROJECT_READ_LIMITER.is_allowed(str(current_user.id)):
+        raise HTTPException(status_code=429, detail="Too many requests, try again later")
+
     return await get_user_projects(
         db=db,
         user_id=current_user.id,
@@ -88,6 +102,10 @@ async def get_project(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    #Защита от Ddos
+    if not await PROJECT_READ_LIMITER.is_allowed(str(current_user.id)):
+        raise HTTPException(status_code=429, detail="Too many requests, try again later")
+
     return await project_service.get_project_by_id_service(
         db=db,
         project_id=project_id,
@@ -104,7 +122,10 @@ async def update_project(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return await project_service.update_project_service(
+    if not await PROJECT_UPDATE_LIMITER.is_allowed(str(current_user.id)):
+        raise HTTPException(status_code=429, detail="Too many updates. Chill out.")
+
+    return await update_project_service(
         db=db,
         project_id=project_id,
         user_id=current_user.id,
