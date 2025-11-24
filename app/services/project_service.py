@@ -16,10 +16,10 @@ from app.repositories.invitation_token_repository import save_invitation_token, 
     delete_invitation_token
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
-    get_all_projects, is_user_member_of_project
+    get_all_projects, is_user_member_of_project, update_project_repository
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
-from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead
+from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject
 from app.services.mail_service import send_email
 from app.utils.error_handler import handle_db_errors
 
@@ -271,3 +271,27 @@ async def get_project_by_id_service(
     )
 
     return project
+
+async def update_project_service(
+        db: AsyncSession,
+        project_id: int,
+        user_id: int,
+        update_schema: UpdateProject
+):
+    project = await get_project_by_id(db, project_id)
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if project.created_by != user_id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    update_data = update_schema.model_dump(exclude_unset=True)
+
+    updated_project = await update_project_repository(db, project, update_data)
+
+    await db.commit()
+
+    await invalidate_user_projects_cache(user_id)
+
+    return updated_project

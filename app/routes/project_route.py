@@ -3,15 +3,16 @@ from typing import List
 from fastapi import APIRouter, status, Query
 from fastapi.params import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.functions import current_user
 
 from app.database import get_db
 from app.config.dependencies import get_current_user
 from app.schemas import project_schema
 from app.models.models import User
-from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, ProjectRead
+from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, ProjectRead, UpdateProject
 
 from app.services import project_service
-from app.services.project_service import join_to_project, get_user_projects
+from app.services.project_service import join_to_project, get_user_projects, update_project_service
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -91,4 +92,21 @@ async def get_project(
         db=db,
         project_id=project_id,
         user_id=current_user.id
+    )
+
+@router.patch(
+    "/{project_id}",
+    response_model=project_schema.ProjectRead
+)
+async def update_project(
+    project_id: int,
+    project_data: project_schema.UpdateProject,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return await project_service.update_project_service(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+        update_schema=project_data
     )
