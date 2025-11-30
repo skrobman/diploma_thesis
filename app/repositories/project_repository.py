@@ -1,4 +1,4 @@
-from sqlalchemy import select, func, exists
+from sqlalchemy import select, func, exists, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -134,3 +134,13 @@ async def update_project_repository(
     await db.refresh(project)
 
     return project
+
+async def delete_project_repository(
+        db: AsyncSession,
+        project_id: int
+) -> bool :
+    stmt = delete(Project).where(Project.id == project_id)
+
+    result = await db.execute(stmt)
+
+    return result.rowcount > 0
