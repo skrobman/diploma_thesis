@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     MAILJET_SECRET_KEY: str
     SENDER_EMAIL: str
     SENDER_NAME: str
+
     RENDER_LINK: str
+    BASE_LINK: str = "http://localhost:8000"
 
     model_config = SettingsConfigDict(
         env_file=".env",

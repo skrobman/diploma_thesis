@@ -10,6 +10,7 @@ from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.auth import security
+from app.config.config import settings
 from app.models.models import User, ActivationToken
 from app.repositories.token_repositories.activation_token_repository import save_activation_token, get_activation_token, \
     delete_activation_token
@@ -99,8 +100,8 @@ async def register_user(db: AsyncSession, data: UserRegisterScheme):
     await save_activation_token(db, token)
 
     try:
-        activation_link = f"https://diploma-thesis.onrender.com/user/activate?token={token.token}"
-        activation_link2 = f"http://localhost:8000/user/activate?token={token.token}"
+        activation_link = f"{settings.RENDER_LINK}/user/activate?token={token.token}"
+        activation_link2 = f"{settings.BASE_LINK}/user/activate?token={token.token}"
         await send_email(
             to_email=new_user.email,
             subject="Activate your account",
@@ -175,8 +176,8 @@ async def forgot_password_service(db: AsyncSession, email: EmailStr):
     await save_activation_token(db, token)
 
     try:
-        activation_link = f"https://diploma-thesis.onrender.com/user/reset-password?token={token.token}"
-        activation_link2 = f"http://localhost:8000/user/reset-password?token={token.token}"
+        activation_link = f"{settings.RENDER_LINK}/user/reset-password?token={token.token}"
+        activation_link2 = f"{settings.BASE_LINK}/user/reset-password?token={token.token}"
         await send_email(
             to_email=user.email,
             subject="Reset your password",

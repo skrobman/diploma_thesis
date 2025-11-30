@@ -5,10 +5,12 @@ import string
 from typing import List
 
 from fastapi import HTTPException
+from pydantic import EmailStr
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import update
 
+from app.config.config import settings
 from app.redis_client import redis_client
 from app.models import models
 from app.models.models import ProjectInvitationTokens, User
@@ -17,7 +19,7 @@ from app.repositories.token_repositories.invitation_token_repository import save
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
     get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
-    delete_project_repository
+    delete_project_repository, get_project_member_by_id
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject
@@ -114,8 +116,8 @@ async def create_project(
             await save_invitation_token(db, invitation_model)
 
             #Отправляем письмо
-            activation_link = f"https://diploma-thesis.onrender.com/projects/invite/{raw_token}"
-            activation_link2 = f"http://localhost:8000/projects/invite/{raw_token}"
+            activation_link = f"{settings.RENDER_LINK}/projects/invite/{raw_token}"
+            activation_link2 = f"{settings.BASE_LINK}/projects/invite/{raw_token}"
 
             await send_email(
                 to_email=user_obj.email,
@@ -157,8 +159,6 @@ async def join_to_project(
             status_code=400,
             detail="Invalid token"
         )
-
-    #project = await get_project_by_id(db, token.project_id)
 
     user = await get_user_by_id(db, token.user_id)
     if not user:
@@ -332,3 +332,78 @@ async def delete_project_service(
 
     await invalidate_user_projects_cache(user_id)
     await invalidate_project_detail_cache(project_id)
+
+@handle_db_errors
+async def invite_users_to_project_service(
+        db: AsyncSession,
+        project_id: int,
+        user_id: int,
+        emails_to_invite: List[EmailStr]
+):
+    project = await get_project_by_id(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    initiator_member = await get_project_member_by_id(
+        db=db,
+        user_id=user_id,
+        project_id=project_id
+    )
+
+    if not initiator_member:
+        raise HTTPException(status_code=403, detail="You are not a member of this project")
+
+    if initiator_member.role_id == 3:
+        raise HTTPException(status_code=403, detail="Not enough permissions to invite")
+
+    initiator_user = await get_user_by_id(db, user_id)
+
+    users_to_invite_objs = []
+
+    for email in list(set(emails_to_invite)):
+        if email == initiator_user.email:
+            raise HTTPException(status_code=400, detail="Cannot invite yourself")
+
+        user_target = await get_user_by_email(db, email)
+        if not user_target:
+            raise HTTPException(status_code=404, detail=f"User {email} not registered")
+
+        is_already_member = await is_user_member_of_project(db, user_target.id, project_id)
+        if is_already_member:
+            raise HTTPException(status_code=409, detail=f"User {email} is already a member")
+
+        users_to_invite_objs.append(user_target)
+
+    try:
+        for user_obj in users_to_invite_objs:
+            raw_token = await asyncio.to_thread(generate_token)
+            hashed_token = await asyncio.to_thread(hash_token, raw_token)
+
+            invitation_model = ProjectInvitationTokens(
+                hashed_token=hashed_token,
+                project_id=project_id,
+                user_id=user_obj.id
+            )
+            await save_invitation_token(db, invitation_model)
+
+            activation_link = f"{settings.RENDER_LINK}/projects/invite/{raw_token}"
+
+            await send_email(
+                to_email=user_obj.email,
+                subject=f"{initiator_user.full_name} invites you to '{project.name}'",
+                text=f"Join code: {raw_token}",
+                html=f"<p>Code: <b>{raw_token}</b>. <a href='{activation_link}'>Join Project</a></p>"
+            )
+
+        await db.execute(
+            update(models.Project)
+            .where(models.Project.id == project.id)
+            .values(updated_at=func.now())
+        )
+
+        await db.commit()
+        return {"message": f"Invites sent to {len(users_to_invite_objs)} users"}
+
+    except Exception as e:
+        await db.rollback()
+        raise e

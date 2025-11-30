@@ -68,6 +68,20 @@ async def get_all_project_roles_repository(db: AsyncSession):
 
     return result.scalars().all()
 
+async def get_project_member_by_id(
+    db: AsyncSession,
+    project_id: int,
+    user_id: int
+):
+    stmt = select(models.ProjectMember).where(
+        models.ProjectMember.user_id == user_id,
+        models.ProjectMember.project_id == project_id
+    )
+
+    result = await db.execute(stmt)
+
+    return result.scalars().first()
+
 async def add_member_to_project(db:AsyncSession, schema: AddProjectMember):
     project_member = ProjectMember(
         project_id=schema.project_id,

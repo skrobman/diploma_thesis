@@ -9,11 +9,11 @@ from app.database import get_db
 from app.config.dependencies import get_current_user
 from app.schemas import project_schema
 from app.models.models import User
-from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, ProjectRead
+from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, ProjectRead, InviteUserRequest
 
 from app.services import project_service
 from app.services.project_service import join_to_project, get_user_projects, update_project_service, \
-    delete_project_service
+    delete_project_service, invite_users_to_project_service
 from app.utils.rateLimiters.rate_limiters import PROJECT_UPDATE_LIMITER, PROJECT_READ_LIMITER, PROJECT_CREATE_LIMITER
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -131,6 +131,25 @@ async def update_project(
         project_id=project_id,
         user_id=current_user.id,
         update_schema=project_data
+    )
+
+@router.post(
+    "/add-user-to-project/{project_id}",
+    summary="Добавление пользователя в проект",
+    description="Добавление пользователей в проект. Мы можем пригласить пользователя только в том случае, если у залогиненного юзера роль = 1 или 2",
+    status_code=status.HTTP_200_OK
+)
+async def add_user_to_user_project(
+    project_id: int,
+    list_of_emails: InviteUserRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return await invite_users_to_project_service(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+        emails_to_invite=list_of_emails.emails,
     )
 
 @router.delete(

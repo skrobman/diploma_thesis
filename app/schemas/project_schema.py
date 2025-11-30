@@ -61,6 +61,9 @@ class AddProjectMember(BaseModel):
     user_id: int
     role_id: int
 
+class InviteUserRequest(BaseModel):
+    emails: List[EmailStr]
+
 class JoinProjectRequest(BaseModel):
     token: str
 
