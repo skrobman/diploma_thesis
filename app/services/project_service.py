@@ -12,11 +12,12 @@ from sqlalchemy import update
 from app.redis_client import redis_client
 from app.models import models
 from app.models.models import ProjectInvitationTokens, User
-from app.repositories.invitation_token_repository import save_invitation_token, get_invitation_token, \
+from app.repositories.token_repositories.invitation_token_repository import save_invitation_token, get_invitation_token, \
     delete_invitation_token
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
-    get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository
+    get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
+    delete_project_repository
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject
@@ -44,6 +45,9 @@ async def invalidate_user_projects_cache(user_id: int):
 
     if keys:
         await redis_client.delete(*keys)
+
+async def invalidate_project_detail_cache(project_id: int):
+    await redis_client.delete(f"project_id:{project_id}")
 
 @handle_db_errors
 async def create_project(
@@ -265,9 +269,7 @@ async def get_project_by_id_service(
     project_dto = ProjectRead.model_validate(project)
 
     json_to_cache = project_dto.model_dump_json(
-        exclude={
-            'items': {'__all__': {'last_activity'}}
-        }
+        exclude={'last_activity'}
     )
 
     await redis_client.set(
@@ -306,4 +308,26 @@ async def update_project_service(
 
     await invalidate_user_projects_cache(user_id)
 
+    await invalidate_project_detail_cache(project_id)
+
     return updated_project
+
+async def delete_project_service(
+        db: AsyncSession,
+        project_id: int,
+        user_id: int
+):
+    project = await get_project_by_id(db, project_id)
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if project.created_by != user_id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    await delete_project_repository(db, project_id)
+
+    await db.commit()
+
+    await invalidate_user_projects_cache(user_id)
+    await invalidate_project_detail_cache(project_id)

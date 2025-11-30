@@ -2,11 +2,13 @@ import asyncio
 import os
 from mailjet_rest import Client
 
+from app.config.config import settings
+
 #MailJet Configuration
-api_key = os.getenv("MAILJET_API_KEY")
-api_secret = os.getenv("MAILJET_SECRET_KEY")
-sender_email = os.getenv("SENDER_EMAIL")
-sender_name = os.getenv("SENDER_NAME")
+api_key = settings.MAILJET_API_KEY
+api_secret = settings.MAILJET_SECRET_KEY
+sender_email = settings.SENDER_EMAIL
+sender_name = settings.SENDER_NAME
 
 mailjet = Client(auth=(api_key, api_secret), version='v3.1')
 

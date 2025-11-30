@@ -11,9 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.auth import security
 from app.models.models import User, ActivationToken
-from app.repositories.activation_token_repository import save_activation_token, get_activation_token, \
+from app.repositories.token_repositories.activation_token_repository import save_activation_token, get_activation_token, \
     delete_activation_token
-from app.repositories.jwt_token_repository import save_jwt_token, verify_jwt_token, revoke_refresh_token
+from app.repositories.token_repositories.jwt_token_repository import save_jwt_token, verify_jwt_token, revoke_refresh_token
 from app.repositories.user_repository import get_user_by_email, create_user, get_user_by_id
 from app.schemas.user_schema import UserRegisterScheme, UserLoginScheme
 from app.services.mail_service import send_email
@@ -55,7 +55,7 @@ async def refresh_token_service(db: AsyncSession, token: str):
 
     try:
         SECRET_KEY = security.config.JWT_SECRET_KEY
-        ALGORITHM = "HS256"
+        ALGORITHM = security.config.JWT_ALGORITHM
 
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 

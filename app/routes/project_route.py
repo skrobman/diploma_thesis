@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, status, Query, HTTPException
+from fastapi import APIRouter, status, Query, HTTPException, Response
 from fastapi.params import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.functions import current_user
@@ -12,7 +12,8 @@ from app.models.models import User
 from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, ProjectRead
 
 from app.services import project_service
-from app.services.project_service import join_to_project, get_user_projects, update_project_service
+from app.services.project_service import join_to_project, get_user_projects, update_project_service, \
+    delete_project_service
 from app.utils.rateLimiters.rate_limiters import PROJECT_UPDATE_LIMITER, PROJECT_READ_LIMITER, PROJECT_CREATE_LIMITER
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -131,3 +132,25 @@ async def update_project(
         user_id=current_user.id,
         update_schema=project_data
     )
+
+@router.delete(
+    "/{project_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Удаление проекта",
+    responses={
+        403: {"description": "Not the owner"},
+        404: {"description": "Project not found"},
+    }
+)
+async def delete_project(
+        project_id: int,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    await delete_project_service(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id
+    )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

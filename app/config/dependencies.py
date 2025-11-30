@@ -17,10 +17,9 @@ async def get_current_user(
     token = credentials.credentials
 
     try:
-        #Получаем секретный ключ прямо из конфига 'security'
+        #Получаем секретный ключ
         SECRET_KEY = security.config.JWT_SECRET_KEY
-        #Указываем алгоритм
-        ALGORITHM = "HS256"
+        ALGORITHM = security.config.JWT_ALGORITHM
         #Декодируем токен
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
