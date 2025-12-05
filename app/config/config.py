@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     SENDER_NAME: str
 
     RENDER_LINK: str
+    FRONTEND_URL: str = "https://tasklytool.netlify.app"
     BASE_LINK: str = "http://localhost:8000"
 
     model_config = SettingsConfigDict(

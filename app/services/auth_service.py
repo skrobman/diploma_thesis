@@ -100,7 +100,7 @@ async def register_user(db: AsyncSession, data: UserRegisterScheme):
     await save_activation_token(db, token)
 
     try:
-        activation_link = f"{settings.RENDER_LINK}/user/activate?token={token.token}"
+        activation_link = f"{settings.FRONTEND_URL}/verifed-email?token={token.token}"
         activation_link2 = f"{settings.BASE_LINK}/user/activate?token={token.token}"
         await send_email(
             to_email=new_user.email,
