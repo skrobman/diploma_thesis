@@ -9,11 +9,12 @@ from app.database import get_db
 from app.config.dependencies import get_current_user
 from app.schemas import project_schema
 from app.models.models import User
-from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, ProjectRead, InviteUserRequest
+from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, ProjectRead, InviteUserRequest, \
+    UpdateProjectMemberRole
 
 from app.services import project_service
 from app.services.project_service import join_to_project, get_user_projects, update_project_service, \
-    delete_project_service, invite_users_to_project_service
+    delete_project_service, invite_users_to_project_service, update_project_member_role_service
 from app.utils.rateLimiters.rate_limiters import PROJECT_UPDATE_LIMITER, PROJECT_READ_LIMITER, PROJECT_CREATE_LIMITER
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -173,3 +174,21 @@ async def delete_project(
     )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.patch(
+    "/{project_id}/change-member-role",
+    summary="Поменять статус пользователя в проекте(Повысить или понизить)",
+    status_code=status.HTTP_200_OK
+)
+async def update_project_member_role(
+        project_id: int,
+        data: UpdateProjectMemberRole,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    return await update_project_member_role_service(
+        db = db,
+        initiator_id=current_user.id,
+        project_id=project_id,
+        data=data,
+    )

@@ -1,16 +1,18 @@
-from sqlalchemy import select, func, exists, delete
+from sqlalchemy import select, func, exists, delete, update, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import models
 from app.models.models import ProjectMember, Project, User
-from app.schemas.project_schema import AddProjectMember, UpdateProject
+from app.schemas.project_schema import AddProjectMember, UpdateProject, UpdateProjectMemberRole
 
 
 async def is_user_member_of_project(db: AsyncSession, user_id: int, project_id: int) -> bool:
     stmt = select(exists().where(
-        models.ProjectMember.user_id == user_id,
-        models.ProjectMember.project_id == project_id
+        and_(
+            models.ProjectMember.user_id == user_id,
+            models.ProjectMember.project_id == project_id
+        )
     ))
     result = await db.execute(stmt)
     return result.scalar()
@@ -74,8 +76,10 @@ async def get_project_member_by_id(
     user_id: int
 ):
     stmt = select(models.ProjectMember).where(
-        models.ProjectMember.user_id == user_id,
-        models.ProjectMember.project_id == project_id
+        and_(
+            models.ProjectMember.user_id == user_id,
+            models.ProjectMember.project_id == project_id
+        )
     )
 
     result = await db.execute(stmt)
@@ -158,3 +162,26 @@ async def delete_project_repository(
     result = await db.execute(stmt)
 
     return result.rowcount > 0
+
+async def change_participant_role(
+        db: AsyncSession,
+        user_to_update_id: int,
+        project_id: int,
+        data: UpdateProjectMemberRole
+):
+    stmt = (
+        update(ProjectMember)
+        .where(
+            ProjectMember.user_id == user_to_update_id,
+            ProjectMember.project_id == project_id ,
+        )
+        .values(role_id = data.role_id)
+        .returning(ProjectMember)
+    )
+
+    result = await db.execute(stmt)
+    updated_member = result.scalar_one_or_none()
+
+    await db.commit()
+
+    return updated_member

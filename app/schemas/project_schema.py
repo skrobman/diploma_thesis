@@ -70,3 +70,7 @@ class JoinProjectRequest(BaseModel):
 class UpdateProject(BaseModel):
     name: str | None = None
     description: str | None = None
+
+class UpdateProjectMemberRole(BaseModel):
+    user_email: EmailStr
+    role_id: int

@@ -19,10 +19,11 @@ from app.repositories.token_repositories.invitation_token_repository import save
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
     get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
-    delete_project_repository, get_project_member_by_id
+    delete_project_repository, get_project_member_by_id, change_participant_role
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
-from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject
+from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject, \
+    UpdateProjectMemberRole
 from app.services.mail_service import send_email
 from app.utils.error_handler import handle_db_errors
 
@@ -50,6 +51,30 @@ async def invalidate_user_projects_cache(user_id: int):
 
 async def invalidate_project_detail_cache(project_id: int):
     await redis_client.delete(f"project_id:{project_id}")
+
+
+async def get_project(
+        db: AsyncSession,
+        project_id: int,
+        user_id:int
+):
+    project = await get_project_by_id(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    initiator_member = await get_project_member_by_id(
+        db=db,
+        user_id=user_id,
+        project_id=project_id
+    )
+
+    if not initiator_member:
+        raise HTTPException(status_code=403, detail="You are not a member of this project")
+
+    if initiator_member.role_id == 3:
+        raise HTTPException(status_code=403, detail="Not enough permissions to invite")
+
+    return project
 
 @handle_db_errors
 async def create_project(
@@ -340,21 +365,11 @@ async def invite_users_to_project_service(
         user_id: int,
         emails_to_invite: List[EmailStr]
 ):
-    project = await get_project_by_id(db, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    initiator_member = await get_project_member_by_id(
+    project = await get_project(
         db=db,
-        user_id=user_id,
-        project_id=project_id
+        project_id=project_id,
+        user_id=user_id
     )
-
-    if not initiator_member:
-        raise HTTPException(status_code=403, detail="You are not a member of this project")
-
-    if initiator_member.role_id == 3:
-        raise HTTPException(status_code=403, detail="Not enough permissions to invite")
 
     initiator_user = await get_user_by_id(db, user_id)
 
@@ -407,3 +422,44 @@ async def invite_users_to_project_service(
     except Exception as e:
         await db.rollback()
         raise e
+
+@handle_db_errors
+async def update_project_member_role_service(
+        db: AsyncSession,
+        initiator_id: int,
+        project_id: int,
+        data: UpdateProjectMemberRole
+):
+    project = await get_project(
+        db=db,
+        project_id=project_id,
+        user_id=initiator_id
+    )
+
+    member_user = await get_user_by_email(db, data.user_email)
+
+    project_member = await get_project_member_by_id(
+        db = db,
+        user_id = member_user.id,
+        project_id = project.id
+    )
+    if not project_member:
+        raise HTTPException(status_code=404, detail=f"User {data.user_email} is not a member of this project")
+
+    if data.role_id == project_member.role_id:
+        raise HTTPException(status_code=400, detail="Role is already the same")
+
+    if data.role_id == 1:
+        raise HTTPException(status_code=400, detail="Cannot assign to owner")
+
+    if data.role_id not in [2, 3]:
+        raise HTTPException(status_code=400, detail="Invalid role_id")
+
+    updated_member = await change_participant_role(
+        db,
+        user_to_update_id=member_user.id,
+        project_id=project_id,
+        data=data
+    )
+
+    return updated_member
