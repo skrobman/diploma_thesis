@@ -3,6 +3,7 @@ import traceback
 from fastapi import APIRouter, Depends, Query, HTTPException, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette import status
 
 from app.config.auth import security
 from app.database import get_db
@@ -24,9 +25,14 @@ async def register(user_data: UserRegisterScheme, db: AsyncSession = Depends(get
 async def login(user_data: UserLoginScheme, db: AsyncSession = Depends(get_db)):
     return await login_user(db, user_data)
 
-@router.get("/activate")
+@router.get(
+    "/activate",
+    status_code=status.HTTP_200_OK
+)
 async def activate_account(token: str = Query(...), db: AsyncSession = Depends(get_db)):
-    return await activate_user(db, token)
+    await activate_user(db, token)
+
+    return {"message": "Account successfully activated!"}
 
 @router.post("/logout", dependencies=[Depends(security.access_token_required)])
 async def logout(data: LogoutRequest, db: AsyncSession = Depends(get_db)):

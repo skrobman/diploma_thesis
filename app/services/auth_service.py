@@ -100,7 +100,7 @@ async def register_user(db: AsyncSession, data: UserRegisterScheme):
     await save_activation_token(db, token)
 
     try:
-        activation_link = f"{settings.FRONTEND_URL}/verifed-email?token={token.token}"
+        activation_link = f"{settings.FRONTEND_URL}/verified-email?token={token.token}"
         activation_link2 = f"{settings.BASE_LINK}/user/activate?token={token.token}"
         await send_email(
             to_email=new_user.email,
@@ -155,8 +155,6 @@ async def activate_user(db: AsyncSession, token_str: str):
 
     user.status = 'active'
     await delete_activation_token(db, token)
-
-    return await _create_user_tokens(db,user)
 
 @handle_db_errors
 async def forgot_password_service(db: AsyncSession, email: EmailStr):
