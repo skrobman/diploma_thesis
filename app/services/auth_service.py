@@ -174,7 +174,7 @@ async def forgot_password_service(db: AsyncSession, email: EmailStr):
     await save_activation_token(db, token)
 
     try:
-        activation_link = f"{settings.RENDER_LINK}/user/reset-password?token={token.token}"
+        activation_link = f"{settings.FRONTEND_URL}/create-new-password?token={token.token}"
         activation_link2 = f"{settings.BASE_LINK}/user/reset-password?token={token.token}"
         await send_email(
             to_email=user.email,

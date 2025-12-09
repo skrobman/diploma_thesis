@@ -6,7 +6,6 @@ from pydantic import BaseModel, EmailStr, computed_field
 from app.schemas.user_schema import UserRead
 from app.utils.date_utils import time_ago
 
-
 class CreateProject(BaseModel):
     name: str
     purpose_id: int
@@ -24,6 +23,7 @@ class ProjectRead(BaseModel):
     id: int
     name: str
     description: str
+    is_archived: bool
     created_at: datetime
     updated_at: datetime
 
@@ -74,3 +74,6 @@ class UpdateProject(BaseModel):
 class UpdateProjectMemberRole(BaseModel):
     user_email: EmailStr
     role_id: int
+
+class UpdateProjectArchiveStatus(BaseModel):
+    is_archived: bool

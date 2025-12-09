@@ -50,7 +50,6 @@ class ActivationToken(Base):
     __tablename__ = 'activation_tokens'
     id = Column(Integer, primary_key=True)
     token = Column(String(255), nullable=False, unique=True)
-    # 👇 CASCADE
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     expiry_date = Column(TIMESTAMP, nullable=False)
     token_purpose = Column(Text, nullable=False)
@@ -68,6 +67,7 @@ class Project(Base):
     created_by = Column(Integer, ForeignKey('users.id'))
     description = Column(Text)
     purpose_id = Column(Integer, ForeignKey("project_purposes.id"))
+    is_archived = Column(Boolean, default=False)
 
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
@@ -135,3 +135,11 @@ class ProjectInvitationTokens(Base):
 
     project = relationship("Project", back_populates="invitation_tokens")
     user = relationship("User", back_populates="invitations")
+
+# class Tasks(Base):
+#     __tablename__ = 'tasks'
+#     id = Column(Integer, primary_key=True)
+#     project_id = Column(Integer, ForeignKey('projects.id', ondelete='CASCADE'), nullable=False)
+#
+#     task_name = Column(String(255), nullable=False)
+#     task_description = Column(Text, nullable=False)

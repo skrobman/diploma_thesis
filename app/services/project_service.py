@@ -19,11 +19,11 @@ from app.repositories.token_repositories.invitation_token_repository import save
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
     get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
-    delete_project_repository, get_project_member_by_id, change_participant_role
+    delete_project_repository, get_project_member_by_id, change_participant_role, update_project_archive_status
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject, \
-    UpdateProjectMemberRole
+    UpdateProjectMemberRole, UpdateProjectArchiveStatus
 from app.services.mail_service import send_email
 from app.utils.error_handler import handle_db_errors
 
@@ -320,6 +320,9 @@ async def update_project_service(
     if project.created_by != user_id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
+    if project.is_archived:
+        raise HTTPException(status_code=409, detail="Cannot modify an archived project.")
+
     new_name = update_schema.name
     if new_name and new_name != project.name:
         duplicate = await check_existing_project(db, user_id, new_name)
@@ -370,6 +373,9 @@ async def invite_users_to_project_service(
         project_id=project_id,
         user_id=user_id
     )
+
+    if project.is_archived:
+        raise HTTPException(status_code=409, detail="Cannot invite users to an archived project.")
 
     initiator_user = await get_user_by_id(db, user_id)
 
@@ -436,6 +442,9 @@ async def update_project_member_role_service(
         user_id=initiator_id
     )
 
+    if project.is_archived:
+        raise HTTPException(status_code=409, detail="Cannot update roles in an archived project.")
+
     member_user = await get_user_by_email(db, data.user_email)
 
     project_member = await get_project_member_by_id(
@@ -463,3 +472,30 @@ async def update_project_member_role_service(
     )
 
     return updated_member
+
+@handle_db_errors
+async def update_project_archive_status_service(
+        db: AsyncSession,
+        project_id: int,
+        initiator_id: int,
+        data: UpdateProjectArchiveStatus
+):
+    project = await get_project(
+        db=db,
+        project_id=project_id,
+        user_id=initiator_id
+    )
+
+    if project.is_archived == data.is_archived:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Project is already {'archived' if project.is_archived else 'not archived'}"
+        )
+
+    archive_status = await update_project_archive_status(
+        db = db,
+        project_id = project.id,
+        data=data
+    )
+
+    return archive_status

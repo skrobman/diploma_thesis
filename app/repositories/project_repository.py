@@ -4,7 +4,8 @@ from sqlalchemy.orm import selectinload
 
 from app.models import models
 from app.models.models import ProjectMember, Project, User
-from app.schemas.project_schema import AddProjectMember, UpdateProject, UpdateProjectMemberRole
+from app.schemas.project_schema import AddProjectMember, UpdateProject, UpdateProjectMemberRole, \
+    UpdateProjectArchiveStatus
 
 
 async def is_user_member_of_project(db: AsyncSession, user_id: int, project_id: int) -> bool:
@@ -185,3 +186,26 @@ async def change_participant_role(
     await db.commit()
 
     return updated_member
+
+async def update_project_archive_status(
+        db: AsyncSession,
+        project_id: int,
+        data: UpdateProjectArchiveStatus
+):
+    stmt = (
+        update(Project)
+        .where(
+            Project.id == project_id,
+        )
+        .values(
+            is_archived = data.is_archived
+        )
+        .returning(Project)
+    )
+
+    result = await db.execute(stmt)
+    updated_project = result.scalar_one_or_none()
+
+    await db.commit()
+
+    return updated_project
