@@ -71,6 +71,15 @@ async def get_all_project_roles_repository(db: AsyncSession):
 
     return result.scalars().all()
 
+async def get_all_project_members_repository(
+    db: AsyncSession,
+    project_id: int
+):
+    stmt = select(ProjectMember).where(ProjectMember.project_id == project_id)
+    result = await db.execute(stmt)
+
+    return result.scalars().all()
+
 async def get_project_member_by_id(
     db: AsyncSession,
     project_id: int,

@@ -20,7 +20,7 @@ from app.repositories.project_repository import get_project_purpose, check_exist
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
     get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
     delete_project_repository, get_project_member_by_id, change_participant_role, update_project_archive_status, \
-    delete_user_from_project_by_id
+    delete_user_from_project_by_id, get_all_project_members_repository
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject, \
@@ -142,7 +142,7 @@ async def create_project(
             await save_invitation_token(db, invitation_model)
 
             #Отправляем письмо
-            activation_link = f"{settings.RENDER_LINK}/projects/invite/{raw_token}"
+            activation_link = f"{settings.RENDER_LINK}/projects/join/{raw_token}"
             activation_link2 = f"{settings.BASE_LINK}/projects/invite/{raw_token}"
 
             await send_email(
@@ -235,24 +235,24 @@ async def get_user_projects(
     cache_key = f"projects:user:{user_id}:cursor:{cursor}:limit:{limit}"
 
     cached_data = await redis_client.get(cache_key)
-
     if cached_data:
         return AllProjectsResponse.model_validate_json(cached_data)
 
-    projects_list, total_count = await asyncio.gather(
+    # Получаем ORM объекты
+    projects_orm, total_count = await asyncio.gather(
         get_all_projects(db, user_id, cursor),
         get_total_of_projects(db, user_id)
     )
 
-    next_cursor = None
+    # Конвертируем каждый проект в Pydantic модель
+    projects_list = [ProjectRead.model_validate(p) for p in projects_orm]
 
+    next_cursor = None
     if projects_list:
         last_project = projects_list[-1]
         next_cursor = last_project.id
-
         if len(projects_list) < limit:
             next_cursor = None
-
 
     response = AllProjectsResponse(
         items=projects_list,
@@ -261,18 +261,67 @@ async def get_user_projects(
     )
 
     json_to_cache = response.model_dump_json(
-        exclude={
-            'items': {'__all__': {'last_activity'}}
-        }
+        exclude={'items': {'__all__': {'last_activity'}}}
     )
 
-    await redis_client.set(
-        cache_key,
-        json_to_cache,
-        ex=600
-    )
+    await redis_client.set(cache_key, json_to_cache, ex=600)
 
     return response
+
+
+async def get_project_users_service(
+        db: AsyncSession,
+        user_id: int,
+        project_id: int,
+):
+    project = await get_project_by_id(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project_member = await get_project_member_by_id(
+        db=db,
+        user_id=user_id,
+        project_id=project.id
+    )
+
+    if not project_member:
+        raise HTTPException(status_code=403, detail="You are not a member of this project")
+
+    return await get_all_project_members_repository(
+        db,
+        project_id
+    )
+
+async def get_project_member_service(
+        db: AsyncSession,
+        initiator_id: int,
+        project_id: int,
+        member_id: int
+):
+    project = await get_project_by_id(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    #Проверяем состоит ли пользователь который делал запрос в проекте
+    requester_membership = await get_project_member_by_id(
+        db=db,
+        user_id=initiator_id,
+        project_id=project.id
+    )
+
+    if not requester_membership:
+        raise HTTPException(status_code=403, detail="You are not a member of this project")
+
+    #Получаем конкретного пользователя
+    target_member = await get_project_member_by_id(
+        db=db,
+        user_id=member_id,
+        project_id=project.id
+    )
+    if not target_member:
+        raise HTTPException(status_code=404, detail=f"Cannot find user in project")
+
+    return target_member
 
 async def get_project_by_id_service(
         db: AsyncSession,

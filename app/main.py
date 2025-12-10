@@ -2,16 +2,23 @@ from authx.exceptions import AuthXException
 from fastapi import FastAPI, HTTPException
 
 from app.config.config_logging import LOGGING_CONFIG
-from app.routes import user, project_route
+from app.routes import user
 
 from fastapi.middleware.cors import CORSMiddleware
 
 import logging.config
 
+from app.routes.projects import general, members, archive, invitations
+
 app = FastAPI()
 app.include_router(user.router)
 
-app.include_router(project_route.router)
+#Роуты для проектов
+app.include_router(general.router)
+app.include_router(invitations.router)
+app.include_router(members.router)
+app.include_router(archive.router)
+
 
 app.add_middleware(
     CORSMiddleware,

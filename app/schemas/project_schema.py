@@ -16,8 +16,9 @@ class ProjectMemberRead(BaseModel):
     role_id: int
     user: UserRead
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
 
 class ProjectRead(BaseModel):
     id: int
@@ -34,13 +35,14 @@ class ProjectRead(BaseModel):
         return time_ago(self.updated_at)
 
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 class AllProjectsResponse(BaseModel):
     items: List[ProjectRead]
     total: int
     next_cursor: Optional[int] = None
+
+    model_config = {"from_attributes": True}
 
 class PurposesRead(BaseModel):
     id: int

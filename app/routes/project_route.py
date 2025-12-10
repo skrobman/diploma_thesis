@@ -15,7 +15,8 @@ from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, 
 from app.services import project_service
 from app.services.project_service import join_to_project, get_user_projects, update_project_service, \
     delete_project_service, invite_users_to_project_service, update_project_member_role_service, \
-    update_project_archive_status_service, leave_project_service, delete_user_from_project
+    update_project_archive_status_service, leave_project_service, delete_user_from_project, get_project_users_service, \
+    get_project_member_service
 from app.utils.rateLimiters.rate_limiters import PROJECT_UPDATE_LIMITER, PROJECT_READ_LIMITER, PROJECT_CREATE_LIMITER
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -175,6 +176,42 @@ async def delete_project(
     )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.get(
+    "/{project_id}/members",
+    status_code=status.HTTP_200_OK,
+    summary="Получение всех пользователей проекта",
+    response_model=List[ProjectMemberRead]
+)
+async def get_project_members(
+        project_id: int,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    return await get_project_users_service(
+        db=db,
+        project_id=project_id,
+        user_id=current_user.id,
+    )
+
+@router.get(
+    "/{project_id}/members/{user_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Получение конкретного пользователя",
+    response_model=ProjectMemberRead
+)
+async def get_project_member(
+        project_id: int,
+        user_id: int,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    return await get_project_member_service(
+        db=db,
+        project_id=project_id,
+        initiator_id=current_user.id,
+        member_id=user_id
+    )
 
 @router.patch(
     "/{project_id}/change-member-role",

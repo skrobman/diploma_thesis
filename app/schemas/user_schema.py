@@ -6,11 +6,13 @@ class UserRegisterScheme(BaseModel):
     password: str
 
 class UserRead(BaseModel):
+    id: int
     full_name: str
     email: EmailStr
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
 
 class UserLoginScheme(BaseModel):
     email: EmailStr
