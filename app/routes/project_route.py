@@ -15,7 +15,7 @@ from app.schemas.project_schema import JoinProjectRequest, AllProjectsResponse, 
 from app.services import project_service
 from app.services.project_service import join_to_project, get_user_projects, update_project_service, \
     delete_project_service, invite_users_to_project_service, update_project_member_role_service, \
-    update_project_archive_status_service
+    update_project_archive_status_service, leave_project_service, delete_user_from_project
 from app.utils.rateLimiters.rate_limiters import PROJECT_UPDATE_LIMITER, PROJECT_READ_LIMITER, PROJECT_CREATE_LIMITER
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -213,3 +213,40 @@ async def update_project_member_role(
         project_id=project_id,
         data=data,
     )
+
+@router.delete(
+    "/{project_id}/leave-project",
+    summary="Покинуть проект",
+    status_code=status.HTTP_200_OK,
+)
+async def leave_project(
+        project_id: int,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    await leave_project_service(
+        db=db,
+        project_id=project_id,
+        initiator_id=current_user.id
+    )
+
+    return {"message": "You have successfully left the project"}
+
+@router.delete(
+    "/projects/{project_id}/users/{user_id}",
+    summary="Удалить пользователя из проекта",
+    status_code=status.HTTP_200_OK
+)
+async def delete_user(
+        project_id: int,
+        user_id: int,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    await delete_user_from_project(
+        db=db,
+        initiator_id=current_user.id,
+        id_of_user_to_delete=user_id,
+        project_id=project_id
+    )
+    return {"message": "User deleted from project"}

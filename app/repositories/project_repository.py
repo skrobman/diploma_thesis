@@ -209,3 +209,20 @@ async def update_project_archive_status(
     await db.commit()
 
     return updated_project
+
+async def delete_user_from_project_by_id(
+    db: AsyncSession,
+    project_id: int,
+    user_id: int
+):
+    stmt = (
+        delete(ProjectMember)
+        .where(
+            ProjectMember.user_id == user_id,
+            ProjectMember.project_id == project_id
+        )
+    )
+
+    result = await db.execute(stmt)
+
+    return result.rowcount > 0

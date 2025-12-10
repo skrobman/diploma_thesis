@@ -19,7 +19,8 @@ from app.repositories.token_repositories.invitation_token_repository import save
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
     get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
-    delete_project_repository, get_project_member_by_id, change_participant_role, update_project_archive_status
+    delete_project_repository, get_project_member_by_id, change_participant_role, update_project_archive_status, \
+    delete_user_from_project_by_id
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject, \
@@ -52,11 +53,11 @@ async def invalidate_user_projects_cache(user_id: int):
 async def invalidate_project_detail_cache(project_id: int):
     await redis_client.delete(f"project_id:{project_id}")
 
-
 async def get_project(
         db: AsyncSession,
         project_id: int,
-        user_id:int
+        user_id:int,
+        msg: str = "Not enough permissions to invite",
 ):
     project = await get_project_by_id(db, project_id)
     if not project:
@@ -72,7 +73,7 @@ async def get_project(
         raise HTTPException(status_code=403, detail="You are not a member of this project")
 
     if initiator_member.role_id == 3:
-        raise HTTPException(status_code=403, detail="Not enough permissions to invite")
+        raise HTTPException(status_code=403, detail=msg)
 
     return project
 
@@ -439,7 +440,8 @@ async def update_project_member_role_service(
     project = await get_project(
         db=db,
         project_id=project_id,
-        user_id=initiator_id
+        user_id=initiator_id,
+        msg="You dont have permission to update member role."
     )
 
     if project.is_archived:
@@ -483,7 +485,8 @@ async def update_project_archive_status_service(
     project = await get_project(
         db=db,
         project_id=project_id,
-        user_id=initiator_id
+        user_id=initiator_id,
+        msg=f"You dont have permission to {'archive' if data.is_archived else 'unarchive'}"
     )
 
     if project.is_archived == data.is_archived:
@@ -499,3 +502,79 @@ async def update_project_archive_status_service(
     )
 
     return archive_status
+
+@handle_db_errors
+async def leave_project_service(
+        db: AsyncSession,
+        project_id: int,
+        initiator_id: int
+):
+    project = await get_project_by_id(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project_member = await get_project_member_by_id(
+        db=db,
+        user_id=initiator_id,
+        project_id=project.id
+    )
+
+    if not project_member:
+        raise HTTPException(status_code=404, detail=f"You are not a member of this project")
+
+    if project_member.role_id == 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Owner cannot leave the project. Transfer ownership first."
+        )
+
+    await delete_user_from_project_by_id(
+        db = db,
+        user_id=project_member.user_id,
+        project_id=project.id
+    )
+
+    await db.commit()
+
+@handle_db_errors
+async def delete_user_from_project(
+        db: AsyncSession,
+        initiator_id: int,
+        id_of_user_to_delete: int,
+        project_id: int,
+):
+    project = await get_project_by_id(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project_member = await get_project_member_by_id(
+        db=db,
+        user_id=initiator_id,
+        project_id=project.id
+    )
+
+    if not project_member:
+        raise HTTPException(status_code=404, detail="You are not a member of this project")
+
+    user_to_delete = await get_project_member_by_id(
+        db=db,
+        user_id=id_of_user_to_delete,
+        project_id=project.id
+    )
+
+    if not user_to_delete:
+        raise HTTPException(status_code=404, detail="User not found in project.")
+
+    if project_member.role_id == 3:
+        raise HTTPException(403, "You don't have permission to delete users.")
+
+    if user_to_delete.role_id == 1 and project_member.role_id != 1:
+        raise HTTPException(403, "You cannot delete the owner of the project.")
+
+    await delete_user_from_project_by_id(
+        db=db,
+        user_id=user_to_delete.user_id,
+        project_id=project.id
+    )
+
+    await db.commit()
