@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
+from starlette.responses import JSONResponse
 
 from app.config.auth import security
 from app.database import get_db
@@ -21,7 +22,25 @@ async def register(user_data: UserRegisterScheme, db: AsyncSession = Depends(get
 
 @router.post("/login")
 async def login(user_data: UserLoginScheme, db: AsyncSession = Depends(get_db)):
-    return await login_user(db, user_data)
+    tokens = await login_user(db, user_data)
+
+    response = JSONResponse(
+        content={
+            "access_token": tokens["access_token"],
+            "token_type": "bearer",
+        }
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=tokens["refresh_token"],
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30,
+    )
+
+    return response
 
 @router.get(
     "/activate",
@@ -46,8 +65,29 @@ async def reset_password(user_data: ResetPasswordScheme, token_str: str = Query(
 
 @router.post("/refresh-token")
 async def refresh_token_route(
-    credentials: HTTPAuthorizationCredentials = Depends(securityCred),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    token = credentials.credentials
-    return await refresh_token_service(db, token)
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token missing")
+
+    tokens = await refresh_token_service(db, refresh_token)
+
+    response = JSONResponse(
+        content={
+            "access_token": tokens["access_token"],
+            "token_type": "bearer",
+        }
+    )
+
+    response.set_cookie(
+        key="refresh_token",
+        value=tokens["refresh_token"],
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30,
+    )
+
+    return response

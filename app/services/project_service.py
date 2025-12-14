@@ -77,6 +77,11 @@ async def get_project(
 
     return project
 
+#TODO Подключить Redis для фоновых задач.
+# Переписать отправку email на асинхронные задачи через RQ.
+# Запускать воркеры отдельно, чтобы не блокировать FastAPI.
+# Перенести генерацию и хэширование токенов в очередь, чтобы ускорить API.
+# Настроить Docker-контейнеры для Redis и воркеров.
 @handle_db_errors
 async def create_project(
         db: AsyncSession,

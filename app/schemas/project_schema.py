@@ -33,7 +33,7 @@ class ProjectRead(BaseModel):
     @computed_field
     def last_activity(self) -> str:
         return time_ago(self.updated_at)
-
+ 
 
     model_config = {"from_attributes": True}
 

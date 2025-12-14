@@ -30,7 +30,6 @@ async def _create_user_tokens(db: AsyncSession, user: User) -> dict:
         data={"email": user.email}
     )
 
-    # Refresh Token
     refresh_token = security.create_refresh_token(
         uid=str(user.id),
         data={"email": user.email}
@@ -41,7 +40,6 @@ async def _create_user_tokens(db: AsyncSession, user: User) -> dict:
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
     }
 
 def create_activation_token(user: User, purpose: str):

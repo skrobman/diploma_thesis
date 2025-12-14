@@ -1,8 +1,10 @@
+from asyncio import tasks
+
 from authx.exceptions import AuthXException
 from fastapi import FastAPI, HTTPException
 
 from app.config.config_logging import LOGGING_CONFIG
-from app.routes import user
+from app.routes import user, task_route
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,6 +21,8 @@ app.include_router(invitations.router)
 app.include_router(members.router)
 app.include_router(archive.router)
 
+#Роуты для тасок
+app.include_router(task_route.router)
 
 app.add_middleware(
     CORSMiddleware,

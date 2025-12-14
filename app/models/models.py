@@ -45,6 +45,15 @@ class User(Base):
         passive_deletes=True
     )
 
+    user_tasks = relationship("UsersTasks", back_populates="user")
+
+    tasks = relationship(
+        "Tasks",
+        secondary="users_tasks",
+        back_populates="users",
+        overlaps="users,task_users"
+    )
+
 
 class ActivationToken(Base):
     __tablename__ = 'activation_tokens'
@@ -98,6 +107,7 @@ class Role(Base):
     name = Column(String(50), unique=True, nullable=False)
 
     members = relationship("ProjectMember", back_populates="role")
+    user_tasks = relationship("UsersTasks", back_populates="role")
 
 
 class ProjectPurposes(Base):
@@ -136,10 +146,63 @@ class ProjectInvitationTokens(Base):
     project = relationship("Project", back_populates="invitation_tokens")
     user = relationship("User", back_populates="invitations")
 
-# class Tasks(Base):
-#     __tablename__ = 'tasks'
-#     id = Column(Integer, primary_key=True)
-#     project_id = Column(Integer, ForeignKey('projects.id', ondelete='CASCADE'), nullable=False)
-#
-#     task_name = Column(String(255), nullable=False)
-#     task_description = Column(Text, nullable=False)
+class Tasks(Base):
+    __tablename__ = 'tasks'
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey('projects.id'), nullable=False)
+
+    priority_id = Column(Integer, ForeignKey('priority_levels.id', ondelete='CASCADE'), nullable=False)
+
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+
+    start_at = Column(TIMESTAMP, nullable=False)
+    deadline_at = Column(TIMESTAMP, nullable=False)
+
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="tasks", overlaps="users,task_users")  # создатель задачи
+    priority = relationship("PriorityLevels", back_populates="tasks")
+
+    task_users = relationship("UsersTasks", back_populates="task", overlaps="users,task_users")
+
+    users = relationship(
+        "User",
+        secondary="users_tasks",
+        back_populates="tasks",
+        overlaps="users,task_users"
+    )
+
+class PriorityLevels(Base):
+    __tablename__ = "priority_levels"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False, unique=True)
+    weight = Column(Integer, nullable=False)
+    color = Column(String(20), nullable=True)
+
+    tasks = relationship("Tasks", back_populates="priority")
+
+class UsersTasks(Base):
+    __tablename__ = "users_tasks"
+
+    id = Column(Integer, primary_key=True)
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True)
+
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="user_tasks")
+    task = relationship("Tasks", back_populates="task_users")
+    role = relationship("Role", back_populates="user_tasks")
+
+    @property
+    def role_name(self):
+        return self.role.name if self.role else None
