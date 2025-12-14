@@ -1,14 +1,36 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.dependencies import get_current_user
 from app.database import get_db
 from app.models.models import User
-from app.schemas.task_schema import ReadTask
-from app.services.task_service import get_task_service
+from app.schemas.task_schema import ReadTask, AllTasksResponse
+from app.services.task_service import get_task_service, get_all_user_tasks_in_project_service
 
 router = APIRouter(prefix="/tasks", tags=["Tasks / Общие"])
 
+@router.get(
+    "/{project_id}",
+    response_model=AllTasksResponse,
+    summary="Получить список Тацок пользователя",
+    description="Возвращает список всех Тацок, к которым принадлежит текущий пользователь на проекте. "
+                "Поддерживается пагинация через cursor и limit. "
+)
+async def get_tasks(
+    project_id: int,
+    cursor: int = Query(0, description="ID последней таски с предыдущей страницы"),
+    limit: int = Query(5, le=10, description="Количество тацок на странице"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    return await get_all_user_tasks_in_project_service(
+        db=db,
+        user_id=current_user.id,
+        project_id=project_id,
+        cursor=cursor,
+        limit=limit
+    )
 @router.get(
     "/{task_id}",
     response_model=ReadTask,

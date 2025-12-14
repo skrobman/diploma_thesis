@@ -1,3 +1,5 @@
+from typing import List
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -19,6 +21,34 @@ async def get_task_by_id_repository(db: AsyncSession, task_id: int) -> Tasks:
     )
 
     return res.scalar_one()
+
+async def get_all_user_tasks_from_project_repository(
+        db: AsyncSession,
+        user_id: int,
+        project_id: int,
+        cursor: int = 0,
+        limit: int = 5
+) -> List[Tasks]:
+    stmt = (
+        select(Tasks)
+        .join(Tasks.task_users)
+        .where(
+            Tasks.project_id == project_id,
+            UsersTasks.user_id == user_id,
+            Tasks.id > cursor  # курсор
+        )
+        .order_by(Tasks.id.asc())
+        .limit(limit)
+        .options(
+            selectinload(Tasks.task_users)
+            .selectinload(UsersTasks.user),
+            selectinload(Tasks.task_users)
+            .selectinload(UsersTasks.role),
+        )
+    )
+
+    result = await db.execute(stmt)
+    return result.scalars().all()
 
 async def is_user_task_member(db: AsyncSession, task_id: int, user_id: int) -> bool:
     result = await db.execute(

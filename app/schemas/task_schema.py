@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -28,5 +29,11 @@ class ReadTask(BaseModel):
     start_at: datetime
     deadline_at: datetime
     members: list[TaskMemberRead]
+
+    model_config = {"from_attributes": True}
+
+class AllTasksResponse(BaseModel):
+    items: List[ReadTask]
+    next_cursor: Optional[int] = None
 
     model_config = {"from_attributes": True}
