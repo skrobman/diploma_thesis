@@ -21,7 +21,7 @@ def build_read_task(task: Tasks) -> ReadTask:
     return ReadTask.model_validate({
         "id": task.id,
         "name": task.name,
-        "priority": task.priority_id,
+        "priority ": task.priority_id,
         "created_by": task.user,
         "description": task.description,
         "start_at": task.start_at,
