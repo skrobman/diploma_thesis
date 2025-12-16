@@ -156,12 +156,12 @@ async def activate_user(db: AsyncSession, token_str: str):
 
 @handle_db_errors
 async def forgot_password_service(db: AsyncSession, email: EmailStr):
-    if not await FORGOT_PASSWORD_LIMITER.is_allowed(str(email)):
-        remaining = await FORGOT_PASSWORD_LIMITER.get_remaining(str(email))
-        raise HTTPException(
-            status_code=429,
-            detail=f"Too many password reset requests. Try again later. Remaining attempts: {remaining}"
-        )
+    # if not await FORGOT_PASSWORD_LIMITER.is_allowed(str(email)):
+    #     remaining = await FORGOT_PASSWORD_LIMITER.get_remaining(str(email))
+    #     raise HTTPException(
+    #         status_code=429,
+    #         detail=f"Too many password reset requests. Try again later. Remaining attempts: {remaining}"
+    #     )
 
     user = await get_user_by_email(db, email)
 
