@@ -5,7 +5,9 @@ from starlette import status
 from starlette.responses import JSONResponse
 
 from app.config.auth import security
+from app.config.dependencies import get_current_user
 from app.database import get_db
+from app.models.models import User
 from app.schemas.jwt_token_schema import LogoutRequest
 from app.schemas.user_schema import UserLoginScheme, UserRegisterScheme, ForgotPasswordScheme, ResetPasswordScheme
 from app.services.auth_service import register_user, login_user, activate_user, forgot_password_service, \
@@ -59,9 +61,17 @@ async def logout(data: LogoutRequest, db: AsyncSession = Depends(get_db)):
 async def forgot_password(user_data: ForgotPasswordScheme, db: AsyncSession = Depends(get_db)):
     return await forgot_password_service(db, user_data.email)
 
+@router.get("/reset_password")
+async def check_reset_password_token(token_str: str = Query(...), db: AsyncSession = Depends(get_db)):
+    return await reset_password_service(db, token_str)
+
 @router.post("/reset-password")
-async def reset_password(user_data: ResetPasswordScheme, token_str: str = Query(...), db: AsyncSession = Depends(get_db)):
-    return await reset_password_service(db, token_str, user_data.password)
+async def reset_password(
+        user_data: ResetPasswordScheme,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db)
+):
+    return await reset_password_service(db, current_user.id, user_data.password)
 
 @router.post("/refresh-token")
 async def refresh_token_route(

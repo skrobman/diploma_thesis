@@ -188,13 +188,18 @@ async def forgot_password_service(db: AsyncSession, email: EmailStr):
 
     return {"message": "Reset link sent to your email"}
 
-@handle_db_errors
-async def reset_password_service(db: AsyncSession, token_str: str, new_password: str):
+async def check_reset_password_token(db: AsyncSession, token_str: str):
     token = await get_activation_token(db, token_str, 'forgot_password')
     if not token:
         raise HTTPException(status_code=400, detail="Invalid token")
 
-    user = await get_user_by_id(db, token.user_id)
+    await delete_activation_token(db, token)
+
+    return {"valid": True}
+
+@handle_db_errors
+async def reset_password_service(db: AsyncSession, user_id: int, new_password: str):
+    user = await get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -202,7 +207,6 @@ async def reset_password_service(db: AsyncSession, token_str: str, new_password:
         raise HTTPException(status_code=400, detail="New password cannot be the same as the old one")
 
     user.password_hash = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    await delete_activation_token(db, token)
 
     return {"message": "Password reset successfully"}
 
