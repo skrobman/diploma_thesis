@@ -9,9 +9,10 @@ from app.config.dependencies import get_current_user
 from app.database import get_db
 from app.models.models import User
 from app.schemas.jwt_token_schema import LogoutRequest
-from app.schemas.user_schema import UserLoginScheme, UserRegisterScheme, ForgotPasswordScheme, ResetPasswordScheme
+from app.schemas.user_schema import UserLoginScheme, UserRegisterScheme, ForgotPasswordScheme, ResetPasswordScheme, \
+    ResetPasswordByTokenScheme
 from app.services.auth_service import register_user, login_user, activate_user, forgot_password_service, \
-    reset_password_service, logout_service, refresh_token_service
+    reset_password_service, logout_service, refresh_token_service, reset_password_by_token_service
 
 router = APIRouter(prefix="/user", tags=["user"])
 securityCred = HTTPBearer()
@@ -62,8 +63,15 @@ async def forgot_password(user_data: ForgotPasswordScheme, db: AsyncSession = De
     return await forgot_password_service(db, user_data.email)
 
 @router.get("/reset_password")
-async def check_reset_password_token(token_str: str = Query(...), db: AsyncSession = Depends(get_db)):
-    return await reset_password_service(db, token_str)
+async def check_reset_password_token(token: str = Query(...), db: AsyncSession = Depends(get_db)):
+    return await reset_password_service(db, token)
+
+@router.post("/reset-password-by-token")
+async def reset_password_by_token(
+        user_data: ResetPasswordByTokenScheme,
+        db: AsyncSession = Depends(get_db)
+):
+    return await reset_password_by_token_service(db, user_data.token, user_data.password)
 
 @router.post("/reset-password")
 async def reset_password(

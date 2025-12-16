@@ -21,5 +21,9 @@ class UserLoginScheme(BaseModel):
 class ForgotPasswordScheme(BaseModel):
     email: EmailStr
 
+class ResetPasswordByTokenScheme(BaseModel):
+    token: str
+    password: str
+
 class ResetPasswordScheme(BaseModel):
     password: str
