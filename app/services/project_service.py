@@ -24,7 +24,7 @@ from app.repositories.project_repository import get_project_purpose, check_exist
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject, \
-    UpdateProjectMemberRole, UpdateProjectArchiveStatus
+    UpdateProjectMemberRole, UpdateProjectArchiveStatus, ProjectMemberRead
 from app.services.mail_service import send_email
 from app.utils.error_handler import handle_db_errors
 
@@ -243,21 +243,45 @@ async def get_user_projects(
     if cached_data:
         return AllProjectsResponse.model_validate_json(cached_data)
 
-    # Получаем ORM объекты
+    # 1. Получаем ORM-объекты
     projects_orm, total_count = await asyncio.gather(
         get_all_projects(db, user_id, cursor, limit),
         get_total_of_projects(db, user_id)
     )
 
-    # Конвертируем каждый проект в Pydantic модель
-    projects_list = [ProjectRead.model_validate(p) for p in projects_orm]
+    projects_list = []
 
+    for p in projects_orm:
+        members_filtered = [
+            m for m in p.members
+            if m.user_id != p.created_by
+        ]
+
+        project_pd = ProjectRead.model_validate({
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "is_archived": p.is_archived,
+            "created_at": p.created_at,
+
+            # владелец проекта
+            "creator": p.creator,
+
+            # участники без владельца
+            "members": [
+                ProjectMemberRead.model_validate(m)
+                for m in members_filtered
+            ]
+        })
+
+        projects_list.append(project_pd)
+
+    # 3. Пагинация
     next_cursor = None
     if projects_list:
         last_project = projects_list[-1]
-        next_cursor = last_project.id
-        if len(projects_list) < limit:
-            next_cursor = None
+        if len(projects_list) == limit:
+            next_cursor = last_project.id
 
     response = AllProjectsResponse(
         items=projects_list,
@@ -265,9 +289,12 @@ async def get_user_projects(
         next_cursor=next_cursor
     )
 
-    json_to_cache = response.model_dump_json()
-
-    await redis_client.set(cache_key, json_to_cache, ex=600)
+    # 4. Кэш
+    await redis_client.set(
+        cache_key,
+        response.model_dump_json(),
+        ex=600
+    )
 
     return response
 
