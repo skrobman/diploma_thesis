@@ -111,7 +111,8 @@ async def add_member_to_project(db:AsyncSession, schema: AddProjectMember):
 async def get_all_projects(
         db: AsyncSession,
         user_id: int,
-        cursor: int
+        cursor: int,
+        limit: int
 ):
     stmt = (
         select(Project)
@@ -124,10 +125,11 @@ async def get_all_projects(
             ProjectMember.user_id == user_id,
         )
         .order_by(Project.id.asc())
-        .limit(5)
+        .limit(limit)
         .options(
             selectinload(Project.members)
-            .selectinload(ProjectMember.user)
+            .selectinload(ProjectMember.user),
+            selectinload(Project.creator)
         )
     )
 

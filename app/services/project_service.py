@@ -245,7 +245,7 @@ async def get_user_projects(
 
     # Получаем ORM объекты
     projects_orm, total_count = await asyncio.gather(
-        get_all_projects(db, user_id, cursor),
+        get_all_projects(db, user_id, cursor, limit),
         get_total_of_projects(db, user_id)
     )
 
@@ -265,9 +265,7 @@ async def get_user_projects(
         next_cursor=next_cursor
     )
 
-    json_to_cache = response.model_dump_json(
-        exclude={'items': {'__all__': {'last_activity'}}}
-    )
+    json_to_cache = response.model_dump_json()
 
     await redis_client.set(cache_key, json_to_cache, ex=600)
 

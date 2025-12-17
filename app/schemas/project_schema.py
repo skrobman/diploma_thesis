@@ -25,15 +25,10 @@ class ProjectRead(BaseModel):
     name: str
     description: str
     is_archived: bool
+    creator: UserRead
     created_at: datetime
-    updated_at: datetime
 
     members: list[ProjectMemberRead] = []
-
-    @computed_field
-    def last_activity(self) -> str:
-        return time_ago(self.updated_at)
- 
 
     model_config = {"from_attributes": True}
 
