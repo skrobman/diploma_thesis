@@ -176,6 +176,18 @@ async def create_project(
         raise e
 
 
+async def check_invite(
+    db: AsyncSession,
+    token: str,
+):
+    hashed_token = hash_token(token)
+    invite = await get_invitation_token(db, hashed_token)
+
+    if not invite:
+        raise HTTPException(400, "Invalid or expired invite")
+
+    return invite
+
 @handle_db_errors
 async def join_to_project(
         db: AsyncSession,
@@ -191,22 +203,21 @@ async def join_to_project(
             detail="Invalid token"
         )
 
-    user = await get_user_by_id(db, token.user_id)
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
+    user = await is_user_member_of_project(
+        db=db,
+        user_id=current_user.id,
+        project_id=token.project_id
+    )
 
-    if user.id != current_user.id:
+    if user:
         raise HTTPException(
-            status_code=403,
-            detail="This invitation is not intended for your account."
+            status_code=400,
+            detail="You are already a member of this project"
         )
 
     member_schema = AddProjectMember(
         project_id=token.project_id,
-        user_id=user.id,
+        user_id=current_user.id,
         role_id=3
     )
     await add_member_to_project(db, member_schema)
