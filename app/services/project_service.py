@@ -231,17 +231,18 @@ async def get_project_roles(
         await get_all_project_roles_repository(db)
     )
 
+#TODO: cache invalidation func
 async def get_user_projects(
         db: AsyncSession,
         user_id: int,
         cursor: int = 0,
         limit: int = 5
 ) -> AllProjectsResponse:
-    cache_key = f"projects:user:{user_id}:cursor:{cursor}:limit:{limit}"
-
-    cached_data = await redis_client.get(cache_key)
-    if cached_data:
-        return AllProjectsResponse.model_validate_json(cached_data)
+    # cache_key = f"projects:user:{user_id}:cursor:{cursor}:limit:{limit}"
+    #
+    # cached_data = await redis_client.get(cache_key)
+    # if cached_data:
+    #     return AllProjectsResponse.model_validate_json(cached_data)
 
     # 1. Получаем ORM-объекты
     projects_orm, total_count = await asyncio.gather(
@@ -289,12 +290,16 @@ async def get_user_projects(
         next_cursor=next_cursor
     )
 
-    # 4. Кэш
-    await redis_client.set(
-        cache_key,
-        response.model_dump_json(),
-        ex=600
-    )
+    # json_to_cache = response.model_dump_json(
+    #     exclude=
+    # )
+    #
+    # # 4. Кэш
+    # await redis_client.set(
+    #     cache_key,
+    #     response.model_dump_json(),
+    #     ex=600
+    # )
 
     return response
 
