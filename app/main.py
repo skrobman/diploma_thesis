@@ -1,7 +1,8 @@
 from asyncio import tasks
 
 from authx.exceptions import AuthXException
-from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request
 
 from app.config.config_logging import LOGGING_CONFIG
 from app.routes import user, task_route
@@ -39,5 +40,41 @@ app.add_middleware(
 logging.config.dictConfig(LOGGING_CONFIG)
 
 @app.exception_handler(AuthXException)
-async def authx_exception_handler(exc: AuthXException):
-    raise HTTPException(status_code=403, detail=str(exc))
+async def authx_exception_handler(
+    request: Request,
+    exc: AuthXException,
+):
+    response = JSONResponse(
+        status_code=403,
+        content={"detail": str(exc)},
+    )
+
+    origin = request.headers.get("origin")
+    if origin in [
+        "http://localhost:5173",
+        "https://tasklytool.netlify.app",
+    ]:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+
+    return response
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(
+    request: Request,
+    exc: HTTPException,
+):
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+    origin = request.headers.get("origin")
+    if origin in [
+        "http://localhost:5173",
+        "https://tasklytool.netlify.app",
+    ]:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+
+    return response
