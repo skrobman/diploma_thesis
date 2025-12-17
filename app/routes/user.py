@@ -13,7 +13,7 @@ from app.schemas.user_schema import UserLoginScheme, UserRegisterScheme, ForgotP
     ResetPasswordByTokenScheme
 from app.services.auth_service import register_user, login_user, activate_user, forgot_password_service, \
     reset_password_service, logout_service, refresh_token_service, reset_password_by_token_service, \
-    check_reset_password_token_service
+    check_reset_password_token_service, get_user_profile_service
 
 router = APIRouter(prefix="/user", tags=["user"])
 securityCred = HTTPBearer()
@@ -110,3 +110,17 @@ async def refresh_token_route(
     )
 
     return response
+
+@router.get(
+    "/me",
+    status_code=status.HTTP_200_OK
+)
+async def get_user_profile(
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+):
+    user_data = await get_user_profile_service(
+        db, current_user.id
+    )
+
+    return {"full_name": user_data.full_name, "email": user_data.email}

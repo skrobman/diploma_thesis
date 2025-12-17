@@ -234,3 +234,10 @@ async def logout_service(db: AsyncSession, token_str: str):
     await revoke_refresh_token(db, token_str)
 
     return {"message": "Successfully logged out"}
+
+async def get_user_profile_service(db: AsyncSession, user_id: int):
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user
