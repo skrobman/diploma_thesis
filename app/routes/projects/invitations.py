@@ -20,8 +20,7 @@ async def accept_invite_link(
     message_props = await check_invite(db, token)
 
     return {
-        "project_id": message_props.project_id,
-        "role_id": message_props.role_id,
+        "project_id": message_props.project_id
     }
 
 @router.post(

@@ -18,31 +18,6 @@ async def get_invitation_token(
 
     return db_token
 
-async def get_invitation_with_role(db: AsyncSession, token_str: str):
-    result = await db.execute(
-        select(ProjectInvitationTokens, User, ProjectMember.role_id)
-        .join(
-            User,
-            User.id == ProjectInvitationTokens.user_id
-        )
-        .join(
-            ProjectMember,
-            (ProjectMember.user_id == User.id) &
-            (ProjectMember.project_id == ProjectInvitationTokens.project_id)
-        )
-        .where(ProjectInvitationTokens.hashed_token == token_str)
-    )
-
-    db_token, user, role_id = result.first()
-
-
-    return {
-        "token": db_token,
-        "user": user,
-        "role_id": role_id
-    }
-
-
 async def save_invitation_token(
         db: AsyncSession,
         token_model: ProjectInvitationTokens
