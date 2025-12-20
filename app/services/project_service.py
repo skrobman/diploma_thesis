@@ -15,7 +15,7 @@ from app.redis_client import redis_client
 from app.models import models
 from app.models.models import ProjectInvitationTokens, User
 from app.repositories.token_repositories.invitation_token_repository import save_invitation_token, get_invitation_token, \
-    delete_invitation_token
+    delete_invitation_token, get_invitation_with_role
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
     get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
@@ -181,12 +181,15 @@ async def check_invite(
     token: str,
 ):
     hashed_token = hash_token(token)
-    invite = await get_invitation_token(db, hashed_token)
+    invite_data = await get_invitation_with_role(db, hashed_token)
+    if not invite_data:
+        raise HTTPException(status_code=404, detail="Invitation not found")
 
-    if not invite:
-        raise HTTPException(400, "Invalid or expired invite")
+    role_id = invite_data["role_id"]
+    user = invite_data["user"]
+    token = invite_data["token"]
 
-    return invite
+    return {"user": user.full_name, "role_id": role_id, "project_id": token.project_id}
 
 @handle_db_errors
 async def join_to_project(

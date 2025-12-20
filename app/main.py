@@ -12,16 +12,6 @@ import logging.config
 from app.routes.projects import general, members, archive, invitations
 
 app = FastAPI()
-app.include_router(user.router)
-
-#Роуты для проектов
-app.include_router(general.router)
-app.include_router(invitations.router)
-app.include_router(members.router)
-app.include_router(archive.router)
-
-#Роуты для тасок
-app.include_router(task_route.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,6 +23,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(user.router)
+
+#Роуты для проектов
+app.include_router(general.router)
+app.include_router(invitations.router)
+app.include_router(members.router)
+app.include_router(archive.router)
+
+#Роуты для тасок
+app.include_router(task_route.router)
 
 # Конфигурация логгера
 logging.config.dictConfig(LOGGING_CONFIG)
