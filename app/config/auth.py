@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from authx import AuthXConfig, AuthX
 
 from app.config.config import settings
@@ -9,7 +11,7 @@ if not secret_key:
 config = AuthXConfig(
     JWT_SECRET_KEY=secret_key,
     JWT_ALGORITHM=settings.JWT_ALGORITHM,
-    JWT_REFRESH_TOKEN_EXPIRES=settings.JWT_REFRESH_TOKEN_EXPIRES,
+    JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=7),
     JWT_COOKIE_CSRF_PROTECT=False
 )
 
