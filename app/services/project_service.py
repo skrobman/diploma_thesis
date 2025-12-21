@@ -169,7 +169,26 @@ async def create_project(
 
         full_project = await get_project_by_id(db, db_project.id)
 
-        return full_project
+        members_filtered = [
+            ProjectMemberRead.model_validate({
+                "user": m.user,
+                "role": m.role.name
+            })
+            for m in full_project.members
+            if m.user_id != full_project.created_by
+        ]
+
+        project_dto = ProjectRead.model_validate({
+            "id": full_project.id,
+            "name": full_project.name,
+            "description": full_project.description,
+            "is_archived": full_project.is_archived,
+            "created_at": full_project.created_at,
+            "creator": full_project.creator,
+            "members": members_filtered
+        })
+
+        return project_dto
 
     except Exception as e:
         await db.rollback()
@@ -265,7 +284,11 @@ async def get_user_projects(
 
     for p in projects_orm:
         members_filtered = [
-            m for m in p.members
+            ProjectMemberRead.model_validate({
+                "role": m.role.name,
+                "user": m.user,
+            })
+            for m in p.members
             if m.user_id != p.created_by
         ]
 
@@ -280,10 +303,7 @@ async def get_user_projects(
             "creator": p.creator,
 
             # участники без владельца
-            "members": [
-                ProjectMemberRead.model_validate(m)
-                for m in members_filtered
-            ]
+            "members": members_filtered
         })
 
         projects_list.append(project_pd)
@@ -314,7 +334,6 @@ async def get_user_projects(
 
     return response
 
-
 async def get_project_users_service(
         db: AsyncSession,
         user_id: int,
@@ -333,10 +352,17 @@ async def get_project_users_service(
     if not project_member:
         raise HTTPException(status_code=403, detail="You are not a member of this project")
 
-    return await get_all_project_members_repository(
-        db,
-        project_id
-    )
+    members_orm = await get_all_project_members_repository(db, project_id)
+
+    members_dto = [
+        ProjectMemberRead.model_validate({
+            "user": m.user,
+            "role": m.role.name
+        })
+        for m in members_orm
+    ]
+
+    return members_dto
 
 async def get_project_member_service(
         db: AsyncSession,
@@ -367,40 +393,44 @@ async def get_project_member_service(
     if not target_member:
         raise HTTPException(status_code=404, detail=f"Cannot find user in project")
 
-    return target_member
+    target_member_dto = ProjectMemberRead.model_validate({
+        "user": target_member.user,
+        "role": target_member.role.name
+    })
+
+    return target_member_dto
 
 async def get_project_by_id_service(
-        db: AsyncSession,
-        project_id: int,
-        user_id: int,
+    db: AsyncSession,
+    project_id: int,
+    user_id: int,
 ) -> ProjectRead:
     is_member = await is_user_member_of_project(db, user_id, project_id)
-
     if not is_member:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    cache_key = f"project_id:{project_id}"
-
-    cached_data = await redis_client.get(cache_key)
-
-    if cached_data:
-        return ProjectRead.model_validate_json(cached_data)
-
     project = await get_project_by_id(db, project_id)
 
-    project_dto = ProjectRead.model_validate(project)
+    members_filtered = [
+        ProjectMemberRead.model_validate({
+            "role": m.role.name,
+            "user": m.user
+        })
+        for m in project.members
+        if m.user_id != project.created_by
+    ]
 
-    json_to_cache = project_dto.model_dump_json(
-        exclude={'last_activity'}
-    )
+    project_dto = ProjectRead.model_validate({
+        "id": project.id,
+        "name": project.name,
+        "description": project.description,
+        "is_archived": project.is_archived,
+        "created_at": project.created_at,
+        "creator": project.creator,
+        "members": members_filtered
+    })
 
-    await redis_client.set(
-        cache_key,
-        json_to_cache,
-        ex=600
-    )
-
-    return project
+    return project_dto
 
 async def update_project_service(
         db: AsyncSession,
@@ -430,12 +460,28 @@ async def update_project_service(
     updated_project = await update_project_repository(db, project, update_data)
 
     await db.commit()
+    await db.refresh(updated_project)
 
-    await invalidate_user_projects_cache(user_id)
+    members_filtered = [
+        ProjectMemberRead.model_validate({
+            "user": m.user,
+            "role": m.role.name
+        })
+        for m in project.members
+        if m.user_id != project.created_by
+    ]
 
-    await invalidate_project_detail_cache(project_id)
+    project_dto = ProjectRead.model_validate({
+        "id": project.id,
+        "name": project.name,
+        "description": project.description,
+        "is_archived": project.is_archived,
+        "created_at": project.created_at,
+        "creator": project.creator,
+        "members": members_filtered
+    })
 
-    return updated_project
+    return project_dto
 
 async def delete_project_service(
         db: AsyncSession,
@@ -568,7 +614,12 @@ async def update_project_member_role_service(
         data=data
     )
 
-    return updated_member
+    updated_member_dto = ProjectMemberRead.model_validate({
+        "user": updated_member.user,
+        "role": updated_member.role.name
+    })
+
+    return updated_member_dto
 
 @handle_db_errors
 async def update_project_archive_status_service(
@@ -590,13 +641,32 @@ async def update_project_archive_status_service(
             detail=f"Project is already {'archived' if project.is_archived else 'not archived'}"
         )
 
-    archive_status = await update_project_archive_status(
-        db = db,
-        project_id = project.id,
-        data=data
-    )
+    async with db.begin():
+        archive_status = await update_project_archive_status(
+            db=db,
+            project_id=project.id,
+            data=data
+        )
 
-    return archive_status
+        await db.refresh(archive_status)
+
+    project_dto = ProjectRead.model_validate({
+        "id": archive_status.id,
+        "name": archive_status.name,
+        "description": archive_status.description,
+        "is_archived": archive_status.is_archived,
+        "created_at": archive_status.created_at,
+        "creator": archive_status.creator,
+        "members": [
+            ProjectMemberRead.model_validate({
+                "user": m.user,
+                "role": m.role.name
+            })
+            for m in archive_status.members if m.user_id != archive_status.created_by
+        ]
+    })
+
+    return project_dto
 
 @handle_db_errors
 async def leave_project_service(

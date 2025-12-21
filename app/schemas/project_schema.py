@@ -13,7 +13,7 @@ class CreateProject(BaseModel):
     users: list[EmailStr] = []
 
 class ProjectMemberRead(BaseModel):
-    role_id: int
+    role: str
     user: UserRead
 
     model_config = {

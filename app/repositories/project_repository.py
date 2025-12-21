@@ -26,19 +26,19 @@ async def get_project_purpose(db: AsyncSession, purpose_id: int):
     )
     return result.scalars().first()
 
-async def get_project_by_id(
-        db: AsyncSession,
-        project_id: int
-):
-    project_stmt = select(models.Project).where(
-        models.Project.id == project_id
-    ).options(
-            # Подгружаем участников и внутри них - пользователей
-            selectinload(models.Project.members).selectinload(models.ProjectMember.user)
+async def get_project_by_id(db: AsyncSession, project_id: int):
+    project_stmt = (
+        select(models.Project)
+        .where(models.Project.id == project_id)
+        .options(
+            selectinload(models.Project.members)
+            .selectinload(models.ProjectMember.user),
+            selectinload(models.Project.members)
+            .selectinload(models.ProjectMember.role),
+            selectinload(models.Project.creator)
+        )
     )
-
     result = await db.execute(project_stmt)
-
     return result.scalars().first()
 
 async def check_existing_project(
@@ -123,12 +123,15 @@ async def get_all_projects(
         .where(
             Project.id > cursor,
             ProjectMember.user_id == user_id,
+            Project.is_archived == False
         )
         .order_by(Project.id.asc())
         .limit(limit)
         .options(
             selectinload(Project.members)
             .selectinload(ProjectMember.user),
+            selectinload(Project.members)
+            .selectinload(ProjectMember.role),
             selectinload(Project.creator)
         )
     )
@@ -195,6 +198,8 @@ async def change_participant_role(
     updated_member = result.scalar_one_or_none()
 
     await db.commit()
+
+    await db.refresh(updated_member)
 
     return updated_member
 
