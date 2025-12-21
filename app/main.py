@@ -4,7 +4,8 @@ from fastapi import FastAPI, HTTPException, Request
 
 from app.config.config_logging import LOGGING_CONFIG
 from app.routes import task_route
-from app.routes.users import user, user_profile
+from app.routes.users.user import router as user_router
+from app.routes.users.user_profile import router as user_profile_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -24,9 +25,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(user.router)
-
-app.include_router(user_profile.router)
+#Роуты для юзеров
+app.include_router(user_router)
+app.include_router(user_profile_router)
 
 #Роуты для проектов
 app.include_router(general.router)
