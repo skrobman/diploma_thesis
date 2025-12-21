@@ -1,18 +1,33 @@
 from pydantic import BaseModel, EmailStr
 
 class UserRegisterScheme(BaseModel):
-    full_name: str
+    name: str
+    surname: str
     email: EmailStr
     password: str
 
 class UserRead(BaseModel):
     id: int
-    full_name: str
+    name: str
+    surname: str
     email: EmailStr
 
     model_config = {
         "from_attributes": True
     }
+
+class ProfileRead(BaseModel):
+    name: str
+    surname: str
+    email: EmailStr
+
+    model_config = {
+        "from_attributes": True
+    }
+
+class ChangeUsername(BaseModel):
+    name: str | None = None
+    surname: str | None = None
 
 class UserLoginScheme(BaseModel):
     email: EmailStr
@@ -20,6 +35,10 @@ class UserLoginScheme(BaseModel):
 
 class ForgotPasswordScheme(BaseModel):
     email: EmailStr
+
+class ChangePasswordScheme(BaseModel):
+    old_password: str
+    new_password: str
 
 class ResetPasswordByTokenScheme(BaseModel):
     token: str

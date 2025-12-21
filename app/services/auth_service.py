@@ -7,6 +7,7 @@ import bcrypt
 from fastapi import HTTPException
 from jose import JWTError, jwt
 from pydantic import EmailStr
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.auth import security
@@ -84,34 +85,52 @@ async def refresh_token_service(db: AsyncSession, token: str):
 
 @handle_db_errors
 async def register_user(db: AsyncSession, data: UserRegisterScheme):
-    # if await get_user_by_email(db, data.email):
-    #     raise HTTPException(status_code=400, detail="Account already exists")
-
-    password_hash = bcrypt.hashpw(data.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    password_hash = bcrypt.hashpw(
+        data.password.encode("utf-8"),
+        bcrypt.gensalt()
+    ).decode("utf-8")
 
     try:
-        new_user = await create_user(db, data.full_name, data.email, password_hash)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        async with db.begin():
+            user = await create_user(
+                db=db,
+                name=data.name,
+                surname=data.surname,
+                email=str(data.email),
+                password_hash=password_hash,
+            )
 
-    token = create_activation_token(new_user, "activation_token")
+
+    except IntegrityError as e:
+        logger.exception(
+            "IntegrityError during user registration. ORIG: %s",
+            e.orig if hasattr(e, "orig") else e
+        )
+
+        raise HTTPException(
+            status_code=400,
+            detail="Integrity error"
+
+        )
+
+    token = create_activation_token(user, "activation_token")
     await save_activation_token(db, token)
 
     try:
         activation_link = f"{settings.FRONTEND_URL}/verified-email?token={token.token}"
         activation_link2 = f"{settings.BASE_LINK}/user/activate?token={token.token}"
+
         await send_email(
-            to_email=new_user.email,
+            to_email=user.email,
             subject="Activate your account",
             text=f"Hello! Activate your account using: {activation_link}",
-            html=f"<p>Hello! Activate your account using: <a href='{activation_link}'>link</a></p>"
+            html=f"<p>Hello! Activate your account using: <a href='{activation_link}'>link</a></p>",
         )
-    except HTTPException as e:
-        raise e
     except Exception as e:
-        logger.exception(f"An unexpected error occurred in sending email: {e}")
+        logger.exception(f"Email sending failed: {e}")
 
-    return new_user
+    return user
+
 
 @handle_db_errors
 async def login_user(db: AsyncSession, data: UserLoginScheme):

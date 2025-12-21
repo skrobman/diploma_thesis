@@ -110,17 +110,3 @@ async def refresh_token_route(
     )
 
     return response
-
-@router.get(
-    "/me",
-    status_code=status.HTTP_200_OK
-)
-async def get_user_profile(
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user)
-):
-    user_data = await get_user_profile_service(
-        db, current_user.id
-    )
-
-    return {"full_name": user_data.full_name, "email": user_data.email}

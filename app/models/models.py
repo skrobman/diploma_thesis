@@ -7,7 +7,9 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
-    full_name = Column(String(100), nullable=False)
+    full_name = Column(String(100), nullable=True)
+    name = Column(String, nullable=False)
+    surname = Column(String, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     status = Column(String(10), server_default='inactive', nullable=False)
     password_hash = Column(Text, nullable=False)

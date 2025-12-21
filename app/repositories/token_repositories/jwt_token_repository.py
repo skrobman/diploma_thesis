@@ -2,7 +2,7 @@ import hashlib
 from datetime import datetime, timedelta
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import User, RefreshToken
@@ -61,3 +61,11 @@ async def revoke_refresh_token(db: AsyncSession, token: str):
     if db_token:
         db_token.is_revoked = True
         await db.commit()
+
+async def revoke_all_user_tokens(db: AsyncSession, user_id: int):
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user_id)
+        .where(RefreshToken.is_revoked == False)
+        .values(is_revoked=True)
+    )

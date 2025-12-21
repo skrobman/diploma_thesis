@@ -152,7 +152,7 @@ async def create_project(
 
             await send_email(
                 to_email=user_obj.email,
-                subject=f"{project_creator.full_name} invites you to project",
+                subject=f"{project_creator.name} {project_creator.surname} invites you to project",
                 text=f"Code: {raw_token}. Link: {activation_link}",
                 html=f"<p>Code: <b>{raw_token}</b>. <a href='{activation_link}'>Link</a></p>"
             )
@@ -553,7 +553,7 @@ async def invite_users_to_project_service(
 
             await send_email(
                 to_email=user_obj.email,
-                subject=f"{initiator_user.full_name} invites you to '{project.name}'",
+                subject=f"{initiator_user.name} {initiator_user.surname} invites you to '{project.name}'",
                 text=f"Join code: {raw_token}",
                 html=f"<p>Code: <b>{raw_token}</b>. <a href='{activation_link}'>Join Project</a></p>"
             )
