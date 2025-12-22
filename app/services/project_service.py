@@ -172,6 +172,7 @@ async def create_project(
 
         members_filtered = [
             ProjectMemberRead.model_validate({
+                "role_id": m.role_id,
                 "user": m.user,
                 "role": m.role.name
             })
@@ -286,8 +287,9 @@ async def get_user_projects(
     for p in projects_orm:
         members_filtered = [
             ProjectMemberRead.model_validate({
-                "role": m.role.name,
+                "role_id": m.role_id,
                 "user": m.user,
+                "role": m.role.name
             })
             for m in p.members
             if m.user_id != p.created_by
@@ -357,6 +359,7 @@ async def get_project_users_service(
 
     members_dto = [
         ProjectMemberRead.model_validate({
+            "role_id": m.role_id,
             "user": m.user,
             "role": m.role.name
         })
@@ -395,6 +398,7 @@ async def get_project_member_service(
         raise HTTPException(status_code=404, detail=f"Cannot find user in project")
 
     target_member_dto = ProjectMemberRead.model_validate({
+        "role_id": target_member.role_id,
         "user": target_member.user,
         "role": target_member.role.name
     })
@@ -414,6 +418,7 @@ async def get_project_by_id_service(
 
     members_filtered = [
         ProjectMemberRead.model_validate({
+            "role_id": m.role_id,
             "role": m.role.name,
             "user": m.user
         })
@@ -465,6 +470,7 @@ async def update_project_service(
 
     members_filtered = [
         ProjectMemberRead.model_validate({
+            "role_id": m.role_id,
             "user": m.user,
             "role": m.role.name
         })
@@ -616,6 +622,7 @@ async def update_project_member_role_service(
     )
 
     updated_member_dto = ProjectMemberRead.model_validate({
+        "role_id": updated_member.role_id,
         "user": updated_member.user,
         "role": updated_member.role.name
     })
@@ -659,6 +666,7 @@ async def update_project_archive_status_service(
         "creator": archive_status.creator,
         "members": [
             ProjectMemberRead.model_validate({
+                "role_id": m.role_id,
                 "user": m.user,
                 "role": m.role.name
             })
