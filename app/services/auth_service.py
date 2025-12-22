@@ -247,10 +247,10 @@ async def reset_password_service(db: AsyncSession, user_id: int, new_password: s
     return {"message": "Password reset successfully"}
 
 @handle_db_errors
-async def logout_service(db: AsyncSession, token_str: str):
-    await verify_jwt_token(db, token_str)
-
-    await revoke_refresh_token(db, token_str)
+async def logout_service(db: AsyncSession, refresh_token: str | None):
+    if refresh_token:
+        await verify_jwt_token(db, refresh_token)
+        await revoke_refresh_token(db, refresh_token)
 
     return {"message": "Successfully logged out"}
 

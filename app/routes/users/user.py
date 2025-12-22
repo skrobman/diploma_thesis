@@ -1,19 +1,17 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, Request
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, Depends, Query, HTTPException, Request, Response, Cookie
+from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 from starlette.responses import JSONResponse
 
-from app.config.auth import security
 from app.config.dependencies import get_current_user
 from app.database import get_db
 from app.models.models import User
-from app.schemas.jwt_token_schema import LogoutRequest
 from app.schemas.user_schema import UserLoginScheme, UserRegisterScheme, ForgotPasswordScheme, ResetPasswordScheme, \
     ResetPasswordByTokenScheme
 from app.services.auth_service import register_user, login_user, activate_user, forgot_password_service, \
     reset_password_service, logout_service, refresh_token_service, reset_password_by_token_service, \
-    check_reset_password_token_service, get_user_profile_service
+    check_reset_password_token_service
 
 router = APIRouter(prefix="/user", tags=["user"])
 securityCred = HTTPBearer()
@@ -55,9 +53,22 @@ async def activate_account(token: str = Query(...), db: AsyncSession = Depends(g
 
     return {"message": "Account successfully activated!"}
 
-@router.post("/logout", dependencies=[Depends(security.access_token_required)])
-async def logout(data: LogoutRequest, db: AsyncSession = Depends(get_db)):
-    return await logout_service(db, data.refresh_token)
+@router.post("/logout")
+async def logout(
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    refresh_token: str | None = Cookie(default=None),
+):
+    result = await logout_service(db, refresh_token)
+
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=True,
+        secure=True,
+        samesite="strict",
+    )
+
+    return result
 
 @router.post("/forgot_password")
 async def forgot_password(user_data: ForgotPasswordScheme, db: AsyncSession = Depends(get_db)):

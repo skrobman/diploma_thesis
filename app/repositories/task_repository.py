@@ -59,6 +59,8 @@ async def is_user_task_member(db: AsyncSession, task_id: int, user_id: int) -> b
         )
     )
     return result.scalar_one_or_none() is not None
+
+
 async def create_task_repository(
         db: AsyncSession,
         task: Tasks
