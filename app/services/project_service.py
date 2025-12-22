@@ -556,7 +556,7 @@ async def invite_users_to_project_service(
             )
             await save_invitation_token(db, invitation_model)
 
-            activation_link = f"{settings.RENDER_LINK}/projects/invite/{raw_token}"
+            activation_link = f"{settings.FRONTEND_URL}/projects/invite/{raw_token}"
 
             await send_email(
                 to_email=user_obj.email,
