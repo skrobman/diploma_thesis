@@ -642,14 +642,13 @@ async def update_project_archive_status_service(
             detail=f"Project is already {'archived' if project.is_archived else 'not archived'}"
         )
 
-    async with db.begin():
-        archive_status = await update_project_archive_status(
-            db=db,
-            project_id=project.id,
-            data=data
-        )
+    archive_status = await update_project_archive_status(
+        db=db,
+        project_id=project.id,
+        data=data
+    )
 
-        await db.refresh(archive_status)
+    await db.refresh(archive_status)
 
     project_dto = ProjectRead.model_validate({
         "id": archive_status.id,
