@@ -122,8 +122,7 @@ async def get_all_projects(
         )
         .where(
             Project.id > cursor,
-            ProjectMember.user_id == user_id,
-            Project.is_archived == False
+            ProjectMember.user_id == user_id
         )
         .order_by(Project.id.asc())
         .limit(limit)
