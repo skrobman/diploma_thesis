@@ -30,7 +30,7 @@ async def get_user_profile(
     }
 
 @router.patch(
-    "/{user_id}",
+    "/me/change_username",
     status_code=status.HTTP_200_OK
 )
 async def update_user_username(
@@ -39,11 +39,11 @@ async def update_user_username(
         current_user: User = Depends(get_current_user)
 ) -> ProfileRead:
     return await change_user_username(
-        db, current_user.id, update_schema
+        db, current_user, update_schema
     )
 
 @router.patch(
-    "/{user_id}/change_password",
+    "/me/change_password",
     status_code=status.HTTP_200_OK
 )
 async def update_user_password(
@@ -52,5 +52,5 @@ async def update_user_password(
         current_user: User = Depends(get_current_user)
 ):
     return await change_password_service(
-        db, current_user.id, data
+        db, current_user, data
     )

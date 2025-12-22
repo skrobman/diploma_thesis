@@ -4,6 +4,7 @@ import bcrypt
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.models import User
 from app.repositories.token_repositories.jwt_token_repository import revoke_refresh_token, revoke_all_user_tokens
 from app.repositories.user_repository import get_user_by_id, change_username_repository
 from app.schemas.user_schema import ChangeUsername, ProfileRead, ChangePasswordScheme
@@ -13,12 +14,10 @@ from app.utils.error_handler import handle_db_errors
 @handle_db_errors
 async def change_user_username(
         db: AsyncSession,
-        user_id: int,
+        current_user: User,
         update_schema: ChangeUsername
 ):
-    initiator = await get_user_by_id(db, user_id)
-    if not initiator:
-        raise HTTPException(status_code=404, detail="User not found")
+    initiator = current_user
 
     update_data = update_schema.model_dump(exclude_unset=True)
 
@@ -44,12 +43,10 @@ async def change_user_username(
 @handle_db_errors
 async def change_password_service(
         db: AsyncSession,
-        user_id: int,
+        current_user: User,
         data: ChangePasswordScheme
 ):
-    user = await get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = current_user
 
     password_correct = await asyncio.to_thread(
         bcrypt.checkpw,
@@ -65,7 +62,7 @@ async def change_password_service(
 
     user.password_hash = bcrypt.hashpw(data.new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-    await revoke_all_user_tokens(db, user_id)
+    await revoke_all_user_tokens(db, current_user.id)
 
     await db.commit()
 

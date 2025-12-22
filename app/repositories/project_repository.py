@@ -139,14 +139,33 @@ async def get_all_projects(
     result = await db.execute(stmt)
     return result.scalars().all()
 
-async def get_total_of_projects(
+async def get_total_of_projects_non_arch(
         db: AsyncSession,
         user_id: int,
 ):
     stmt = (
         select(func.count(Project.id))
         .join(ProjectMember, ProjectMember.project_id == Project.id)
-        .where(ProjectMember.user_id == user_id)
+        .where(
+            ProjectMember.user_id == user_id,
+            Project.is_archived == False
+        )
+    )
+
+    total_projects = (await db.execute(stmt)).scalar_one()
+    return total_projects
+
+async def get_total_of_projects_arch(
+        db: AsyncSession,
+        user_id: int,
+):
+    stmt = (
+        select(func.count(Project.id))
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .where(
+            ProjectMember.user_id == user_id,
+            Project.is_archived == True
+        )
     )
 
     total_projects = (await db.execute(stmt)).scalar_one()

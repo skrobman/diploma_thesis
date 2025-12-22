@@ -17,10 +17,11 @@ from app.models.models import ProjectInvitationTokens, User
 from app.repositories.token_repositories.invitation_token_repository import save_invitation_token, get_invitation_token, \
     delete_invitation_token
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
-    get_all_project_purposes_repository, add_member_to_project, get_project_by_id, get_total_of_projects, \
+    get_all_project_purposes_repository, add_member_to_project, get_project_by_id, \
     get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
     delete_project_repository, get_project_member_by_id, change_participant_role, update_project_archive_status, \
-    delete_user_from_project_by_id, get_all_project_members_repository
+    delete_user_from_project_by_id, get_all_project_members_repository, get_total_of_projects_non_arch, \
+    get_total_of_projects_arch
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject, \
@@ -277,7 +278,7 @@ async def get_user_projects(
     # 1. Получаем ORM-объекты
     projects_orm, total_count = await asyncio.gather(
         get_all_projects(db, user_id, cursor, limit),
-        get_total_of_projects(db, user_id)
+        get_total_of_projects_non_arch(db, user_id)
     )
 
     projects_list = []
