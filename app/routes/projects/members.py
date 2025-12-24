@@ -132,7 +132,7 @@ async def delete_user_from_project(
 ):
     await project_service.delete_user_from_project(
         db=db,
-        initiator_id=current_user.id,
+        current_user=current_user,
         id_of_user_to_delete=user_id,
         project_id=project_id
     )

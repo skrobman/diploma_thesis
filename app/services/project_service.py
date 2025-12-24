@@ -605,6 +605,12 @@ async def update_project_member_role_service(
     if not project_member:
         raise HTTPException(status_code=404, detail=f"User {data.user_email} is not a member of this project")
 
+    if member_user.id == initiator_id:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot change your own role"
+        )
+
     if data.role_id == project_member.role_id:
         raise HTTPException(status_code=400, detail="Role is already the same")
 
@@ -709,40 +715,46 @@ async def leave_project_service(
 
     await db.commit()
 
-@handle_db_errors
 async def delete_user_from_project(
-        db: AsyncSession,
-        initiator_id: int,
-        id_of_user_to_delete: int,
-        project_id: int,
+    db: AsyncSession,
+    current_user: User,
+    id_of_user_to_delete: int,
+    project_id: int,
 ):
     project = await get_project_by_id(db, project_id)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(404, "Project not found")
 
     project_member = await get_project_member_by_id(
         db=db,
-        user_id=initiator_id,
+        user_id=current_user.id,
         project_id=project.id
     )
-
     if not project_member:
-        raise HTTPException(status_code=404, detail="You are not a member of this project")
+        raise HTTPException(404, "You are not a member of this project")
+
+    if project_member.role_id == 3:
+        raise HTTPException(403, "You don't have permission to delete users.")
 
     user_to_delete = await get_project_member_by_id(
         db=db,
         user_id=id_of_user_to_delete,
         project_id=project.id
     )
-
     if not user_to_delete:
-        raise HTTPException(status_code=404, detail="User not found in project.")
+        raise HTTPException(404, "User not found in project.")
 
-    if project_member.role_id == 3:
-        raise HTTPException(403, "You don't have permission to delete users.")
+    if user_to_delete.user_id == current_user.id:
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot delete yourself, use leave project endpoint"
+        )
 
-    if user_to_delete.role_id == 1 and project_member.role_id != 1:
+    if user_to_delete.role_id == 1:
         raise HTTPException(403, "You cannot delete the owner of the project.")
+
+    if project_member.role_id == 2 and user_to_delete.role_id == 2:
+        raise HTTPException(403, "Admins cannot delete other admins.")
 
     await delete_user_from_project_by_id(
         db=db,
