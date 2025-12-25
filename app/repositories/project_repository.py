@@ -260,3 +260,37 @@ async def delete_user_from_project_by_id(
     result = await db.execute(stmt)
 
     return result.rowcount > 0
+
+
+async def transfer_ownership(
+        db: AsyncSession,
+        initiator_id: int,
+        user_to_update_id: int,
+        project_id: int,
+):
+    await db.execute(
+        update(ProjectMember)
+        .where(
+            ProjectMember.user_id == initiator_id,
+            ProjectMember.project_id == project_id
+        )
+        .values(role_id=2)
+    )
+
+    result = await db.execute(
+        update(ProjectMember)
+        .where(
+            ProjectMember.user_id == user_to_update_id,
+            ProjectMember.project_id == project_id
+        )
+        .values(role_id=1)
+        .returning(ProjectMember)
+    )
+
+    updated_member = result.scalar_one()
+
+    await db.commit()
+
+    await db.refresh(updated_member)
+
+    return updated_member

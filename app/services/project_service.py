@@ -21,7 +21,7 @@ from app.repositories.project_repository import get_project_purpose, check_exist
     get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
     delete_project_repository, get_project_member_by_id, change_participant_role, update_project_archive_status, \
     delete_user_from_project_by_id, get_all_project_members_repository, get_total_of_projects_non_arch, \
-    get_total_of_projects_arch
+    get_total_of_projects_arch, transfer_ownership
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject, \
@@ -595,6 +595,18 @@ async def update_project_member_role_service(
     if project.is_archived:
         raise HTTPException(status_code=409, detail="Cannot update roles in an archived project.")
 
+    initiator_member = await get_project_member_by_id(
+        db=db,
+        user_id=initiator_id,
+        project_id=project_id
+    )
+
+    if not initiator_member:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not a member of this project"
+        )
+
     member_user = await get_user_by_email(db, data.user_email)
 
     project_member = await get_project_member_by_id(
@@ -615,10 +627,22 @@ async def update_project_member_role_service(
         raise HTTPException(status_code=400, detail="Role is already the same")
 
     if data.role_id == 1:
-        raise HTTPException(status_code=400, detail="Cannot assign to owner")
+        if initiator_member.role_id != 1:
+            raise HTTPException(status_code=403, detail="Only the owner can transfer ownership")
+
+        updated_member = await transfer_ownership(db, initiator_id, member_user.id, project_id)
+
+        return ProjectMemberRead.model_validate({
+            "role_id": updated_member.role_id,
+            "user": updated_member.user,
+            "role": updated_member.role.name
+        })
 
     if data.role_id not in [2, 3]:
         raise HTTPException(status_code=400, detail="Invalid role_id")
+
+    if initiator_member.role_id == 2 and target_member.role_id == 2:
+        raise HTTPException(status_code=403, detail="Admins cannot change other admins' roles")
 
     updated_member = await change_participant_role(
         db,

@@ -167,7 +167,7 @@ class Tasks(Base):
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="tasks", overlaps="users,task_users")  # создатель задачи
-    priority = relationship("PriorityLevels", back_populates="tasks")
+    priority = relationship("PriorityLevels", back_populates="tasks", lazy="selectin")
 
     task_users = relationship("UsersTasks", back_populates="task", overlaps="users,task_users")
 
@@ -184,7 +184,6 @@ class PriorityLevels(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(50), nullable=False, unique=True)
     weight = Column(Integer, nullable=False)
-    color = Column(String(20), nullable=True)
 
     tasks = relationship("Tasks", back_populates="priority")
 

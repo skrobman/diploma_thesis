@@ -10,6 +10,23 @@ from app.services.task_service import get_task_service, get_all_user_tasks_in_pr
 router = APIRouter(prefix="/tasks", tags=["Tasks / Общие"])
 
 @router.get(
+    "/{task_id}",
+    response_model=ReadTask,
+    summary="Получить конкретную тацку",
+    description="Возвращает информацию о конкретной тацке по его ID, если пользователь привязан к тацке. "
+)
+async def get_task(
+    task_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return await get_task_service(
+        db=db,
+        task_id=task_id,
+        user_id=current_user.id
+    )
+
+@router.get(
     "/{project_id}",
     response_model=AllTasksResponse,
     summary="Получить список Тацок пользователя",
@@ -31,19 +48,4 @@ async def get_tasks(
         cursor=cursor,
         limit=limit
     )
-@router.get(
-    "/{task_id}",
-    response_model=ReadTask,
-    summary="Получить конкретную тацку",
-    description="Возвращает информацию о конкретной тацке по его ID, если пользователь привязан к тацке. "
-)
-async def get_task(
-    task_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return await get_task_service(
-        db=db,
-        task_id=task_id,
-        user_id=current_user.id
-    )
+

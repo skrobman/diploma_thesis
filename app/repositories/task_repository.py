@@ -20,7 +20,7 @@ async def get_task_by_id_repository(db: AsyncSession, task_id: int) -> Tasks:
         )
     )
 
-    return res.scalar_one()
+    return res.scalar_one_or_none()
 
 async def get_all_user_tasks_from_project_repository(
         db: AsyncSession,

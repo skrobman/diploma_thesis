@@ -7,6 +7,7 @@ from app.schemas.user_schema import UserRead
 
 
 class CreateTask(BaseModel):
+    project_name: str
     name: str
     priority_id: int
     description: str = None
@@ -23,8 +24,10 @@ class TaskMemberRead(BaseModel):
 class ReadTask(BaseModel):
     id: int
     name: str
-    priority: int
+    priority_id: int
+    priority_name: str
     created_by: UserRead
+    weight: int
     description: str
     start_at: datetime
     deadline_at: datetime
