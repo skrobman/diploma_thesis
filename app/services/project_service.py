@@ -148,7 +148,7 @@ async def create_project(
             await save_invitation_token(db, invitation_model)
 
             #Отправляем письмо
-            activation_link = f"{settings.RENDER_LINK}/projects/join/{raw_token}"
+            activation_link = f"{settings.FRONTEND_URL}/projects/join/{raw_token}"
             activation_link2 = f"{settings.BASE_LINK}/projects/invite/{raw_token}"
 
             await send_email(
