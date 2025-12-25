@@ -15,13 +15,13 @@ from app.redis_client import redis_client
 from app.models import models
 from app.models.models import ProjectInvitationTokens, User
 from app.repositories.token_repositories.invitation_token_repository import save_invitation_token, get_invitation_token, \
-    delete_invitation_token
+    delete_invitation_token, get_user_invite_token, delete_invite_token_by_obj
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, \
     get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
     delete_project_repository, get_project_member_by_id, change_participant_role, update_project_archive_status, \
     delete_user_from_project_by_id, get_all_project_members_repository, get_total_of_projects_non_arch, \
-    get_total_of_projects_arch, transfer_ownership
+    get_total_of_projects_arch, transfer_ownership, has_active_invite
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject, \
@@ -512,10 +512,10 @@ async def delete_project_service(
 
 @handle_db_errors
 async def invite_users_to_project_service(
-        db: AsyncSession,
-        project_id: int,
-        user_id: int,
-        emails_to_invite: List[EmailStr]
+    db: AsyncSession,
+    project_id: int,
+    user_id: int,
+    emails_to_invite: List[EmailStr]
 ):
     project = await get_project(
         db=db,
@@ -524,59 +524,68 @@ async def invite_users_to_project_service(
     )
 
     if project.is_archived:
-        raise HTTPException(status_code=409, detail="Cannot invite users to an archived project.")
+        raise HTTPException(409, "Cannot invite users to an archived project.")
 
     initiator_user = await get_user_by_id(db, user_id)
 
-    users_to_invite_objs = []
+    unique_emails = list(dict.fromkeys(emails_to_invite))
+    if len(unique_emails) != len(emails_to_invite):
+        raise HTTPException(400, "Duplicate emails are not allowed")
 
-    for email in list(set(emails_to_invite)):
+    for email in unique_emails:
         if email == initiator_user.email:
-            raise HTTPException(status_code=400, detail="Cannot invite yourself")
+            raise HTTPException(400, "Cannot invite yourself")
 
         user_target = await get_user_by_email(db, email)
         if not user_target:
-            raise HTTPException(status_code=404, detail=f"User {email} not registered")
+            raise HTTPException(404, f"User {email} not registered")
 
-        is_already_member = await is_user_member_of_project(db, user_target.id, project_id)
-        if is_already_member:
-            raise HTTPException(status_code=409, detail=f"User {email} is already a member")
-
-        users_to_invite_objs.append(user_target)
-
-    try:
-        for user_obj in users_to_invite_objs:
-            raw_token = await asyncio.to_thread(generate_token)
-            hashed_token = await asyncio.to_thread(hash_token, raw_token)
-
-            invitation_model = ProjectInvitationTokens(
-                hashed_token=hashed_token,
-                project_id=project_id,
-                user_id=user_obj.id
-            )
-            await save_invitation_token(db, invitation_model)
-
-            activation_link = f"{settings.FRONTEND_URL}/projects/invite/{raw_token}"
-
-            await send_email(
-                to_email=user_obj.email,
-                subject=f"{initiator_user.name} {initiator_user.surname} invites you to '{project.name}'",
-                text=f"Join code: {raw_token}",
-                html=f"<p>Code: <b>{raw_token}</b>. <a href='{activation_link}'>Join Project</a></p>"
+        is_member = await is_user_member_of_project(
+            db,
+            user_target.id,
+            project_id
+        )
+        if is_member:
+            raise HTTPException(
+                409,
+                f"User {email} is already a member of this project"
             )
 
-        await db.execute(
-            update(models.Project)
-            .where(models.Project.id == project.id)
-            .values(updated_at=func.now())
+        has_invite = await has_active_invite(
+            db,
+            user_target.id,
+            project_id
+        )
+        if has_invite:
+            user_invite_token = await get_user_invite_token(db, user_target.id)
+
+            await delete_invite_token_by_obj(db, user_invite_token)
+
+    for email in unique_emails:
+        user_target = await get_user_by_email(db, email)
+
+        raw_token = await asyncio.to_thread(generate_token)
+        hashed_token = await asyncio.to_thread(hash_token, raw_token)
+
+        invitation_model = ProjectInvitationTokens(
+            hashed_token=hashed_token,
+            project_id=project_id,
+            user_id=user_target.id
+        )
+        await save_invitation_token(db, invitation_model)
+
+        activation_link = f"{settings.FRONTEND_URL}/projects/invite/{raw_token}"
+
+        await send_email(
+            to_email=user_target.email,
+            subject=f"{initiator_user.name} {initiator_user.surname} invites you to '{project.name}'",
+            text=f"Join code: {raw_token}",
+            html=f"<p>Code: <b>{raw_token}</b>. <a href='{activation_link}'>Join Project</a>"
         )
 
-        await db.commit()
-        return {"message": f"Invites sent to {len(users_to_invite_objs)} users"}
+    await db.commit()
 
-    except Exception as e:
-        await db.rollback()
-        raise e
+    return {"message": f"Invites sent to {len(unique_emails)} users"}
 
 @handle_db_errors
 async def update_project_member_role_service(
@@ -641,7 +650,7 @@ async def update_project_member_role_service(
     if data.role_id not in [2, 3]:
         raise HTTPException(status_code=400, detail="Invalid role_id")
 
-    if initiator_member.role_id == 2 and target_member.role_id == 2:
+    if initiator_member.role_id == 2 and project_member.role_id == 2:
         raise HTTPException(status_code=403, detail="Admins cannot change other admins' roles")
 
     updated_member = await change_participant_role(

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import models
-from app.models.models import ProjectMember, Project, User
+from app.models.models import ProjectMember, Project, User, ProjectInvitationTokens
 from app.schemas.project_schema import AddProjectMember, UpdateProject, UpdateProjectMemberRole, \
     UpdateProjectArchiveStatus
 
@@ -294,3 +294,16 @@ async def transfer_ownership(
     await db.refresh(updated_member)
 
     return updated_member
+
+async def has_active_invite(
+    db: AsyncSession,
+    user_id: int,
+    project_id: int
+) -> bool:
+    result = await db.execute(
+        select(ProjectInvitationTokens.id).where(
+            ProjectInvitationTokens.user_id == user_id,
+            ProjectInvitationTokens.project_id == project_id,
+        )
+    )
+    return result.scalar_one_or_none() is not None
