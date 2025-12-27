@@ -27,7 +27,7 @@ async def create_task(
     )
 
 @router.get(
-    "/{task_id}",
+    "/task/{task_id}",
     response_model=ReadTask,
     summary="Получить конкретную тацку",
     description="Возвращает информацию о конкретной тацке по его ID, если пользователь привязан к тацке. "
