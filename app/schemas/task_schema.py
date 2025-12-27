@@ -1,19 +1,40 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator, model_validator, EmailStr
 
 from app.schemas.user_schema import UserRead
 
+def today_start():
+    return datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+def today_end():
+    return datetime.now(timezone.utc).replace(hour=23, minute=59, second=59, microsecond=0)
 
 class CreateTask(BaseModel):
-    project_name: str
+    project_id: int
     name: str
     priority_id: int
     description: str = None
-    start_at: datetime
-    deadline_at: datetime
-    users: list[int]
+    start_at: datetime = Field(default_factory=today_start)
+    deadline_at: datetime = Field(default_factory=today_end)
+    users: list[EmailStr] = []
+
+    @field_validator('start_at', 'deadline_at')
+    def force_utc(cls, v: datetime):
+        #Если фронт прислал время без зоны, считаем, что это UTC
+        if v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+
+        # Если фронт прислал время с зоной - переводим в UTC,
+        # переводим его в UTC
+        return v.astimezone(timezone.utc)
+
+    @model_validator(mode='after')
+    def check_dates_order(self):
+        if self.start_at > self.deadline_at:
+            raise ValueError('Deadline must be after start')
+        return self
 
 class TaskMemberRead(BaseModel):
     role: str
@@ -21,13 +42,25 @@ class TaskMemberRead(BaseModel):
 
     model_config = {"from_attributes": True}
 
+class ReadCreatedTask(BaseModel):
+    project_id: int
+    name: str
+    description: str = None
+    priority_name: str
+    start_at: datetime
+    deadline_at: datetime
+    created_by: UserRead
+    members: list[TaskMemberRead]
+
+    model_config = {"from_attributes": True}
+
 class ReadTask(BaseModel):
     id: int
     name: str
     priority_id: int
-    priority_name: str
+    priority_name: str | None = None
     created_by: UserRead
-    weight: int
+    weight: int | None
     description: str
     start_at: datetime
     deadline_at: datetime

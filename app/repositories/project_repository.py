@@ -1,3 +1,5 @@
+from typing import List, Dict, Tuple
+
 from sqlalchemy import select, func, exists, delete, update, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -7,6 +9,30 @@ from app.models.models import ProjectMember, Project, User, ProjectInvitationTok
 from app.schemas.project_schema import AddProjectMember, UpdateProject, UpdateProjectMemberRole, \
     UpdateProjectArchiveStatus
 
+
+async def get_project_members_with_roles(
+        db: AsyncSession,
+        project_id: int,
+        emails: List[str]
+) -> Dict[str, Tuple[int, int]]:
+    if not emails:
+        return {}
+
+    clean_emails = [e.lower().strip() for e in emails]
+
+    query = (
+        select(User.email, User.id, ProjectMember.role_id)
+        .join(ProjectMember, ProjectMember.user_id == User.id)
+        .where(
+            ProjectMember.project_id == project_id,
+            func.lower(User.email).in_(clean_emails)
+        )
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    return {row.email.lower(): (row.id, row.role_id) for row in rows}
 
 async def is_user_member_of_project(db: AsyncSession, user_id: int, project_id: int) -> bool:
     stmt = select(exists().where(

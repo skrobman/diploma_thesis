@@ -1,8 +1,18 @@
+from datetime import datetime, time, timezone
+
 from sqlalchemy import Column, Integer, String, Text, ForeignKey, func, Boolean
 from sqlalchemy.types import TIMESTAMP
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
+
+def get_start_of_today():
+    now = datetime.now(timezone.utc)
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+def get_end_of_today():
+    now = datetime.now(timezone.utc)
+    return now.replace(hour=23, minute=59, second=59, microsecond=0)
 
 class User(Base):
     __tablename__ = 'users'
@@ -47,13 +57,16 @@ class User(Base):
         passive_deletes=True
     )
 
-    user_tasks = relationship("UsersTasks", back_populates="user")
+    user_tasks = relationship(
+        "UsersTasks",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
 
-    tasks = relationship(
+    tasks_created = relationship(
         "Tasks",
-        secondary="users_tasks",
-        back_populates="users",
-        overlaps="users,task_users"
+        back_populates="creator"
     )
 
 
@@ -158,24 +171,34 @@ class Tasks(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
 
-    start_at = Column(TIMESTAMP, nullable=False)
-    deadline_at = Column(TIMESTAMP, nullable=False)
+    start_at = Column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=get_start_of_today
+    )
+
+    deadline_at = Column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        default=get_end_of_today
+    )
 
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
-    user = relationship("User", back_populates="tasks", overlaps="users,task_users")  # создатель задачи
+    creator = relationship(
+        "User",
+        back_populates="tasks_created"
+    )
     priority = relationship("PriorityLevels", back_populates="tasks", lazy="selectin")
 
-    task_users = relationship("UsersTasks", back_populates="task", overlaps="users,task_users")
-
-    users = relationship(
-        "User",
-        secondary="users_tasks",
-        back_populates="tasks",
-        overlaps="users,task_users"
+    task_users = relationship(
+        "UsersTasks",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        lazy="selectin"
     )
 
 class PriorityLevels(Base):
