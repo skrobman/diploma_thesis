@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models import models
 from app.models.models import Tasks, UsersTasks, PriorityLevels
-from app.schemas.task_schema import CreateTask
+from app.schemas.task_schema import CreateTask, CalendarTasksRead
 from app.utils.enums.enum_utils import TaskPeriod
 
 async def get_all_priorities(
@@ -33,10 +33,39 @@ async def get_task_by_id_repository(db: AsyncSession, task_id: int) -> Tasks:
 
     return res.scalar_one_or_none()
 
-# async def get_all_user_tasks(
-#         db: AsyncSession,
-#         user_id: int,
-# ) -> List[Tasks]:
+async def get_all_user_tasks_for_calendar(
+        db: AsyncSession,
+        user_id: int,
+        year: int,
+        month: int,
+):
+    start_of_month = datetime(year, month, 1)
+    end_of_month = (start_of_month + timedelta(days=32)).replace(day=1) - timedelta(seconds=1)
+
+    stmt = (
+        select(
+            Tasks.project_id,
+            Tasks.id.label("task_id"),
+            Tasks.name,
+            Tasks.description,
+            Tasks.priority_id,
+            Tasks.start_at,
+            Tasks.deadline_at
+        )
+        .join(UsersTasks, Tasks.id == UsersTasks.task_id)
+        .where(
+            UsersTasks.user_id == user_id,
+            Tasks.start_at <= end_of_month,
+            Tasks.deadline_at >= start_of_month,
+        )
+        .order_by(Tasks.start_at)
+    )
+
+    result = await db.execute(stmt)
+    tasks_from_db = result.all()
+
+    return [CalendarTasksRead.model_validate(dict(row._mapping)) for row in tasks_from_db]
+
 
 async def get_all_user_tasks_from_project_repository(
     db: AsyncSession,
