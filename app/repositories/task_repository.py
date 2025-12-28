@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.models import models
 from app.models.models import Tasks, UsersTasks
 from app.schemas.task_schema import CreateTask
-from app.utils.enums.enum_utils import TaskPeriod
+from app.utils.enums.enum_utils import TaskPeriod, TaskStatus
 
 
 async def get_task_by_id_repository(db: AsyncSession, task_id: int) -> Tasks:
@@ -52,24 +52,46 @@ async def get_all_user_tasks_from_project_repository(
 
     if period is not None:
         today = date.today()
+        now = datetime.now()
 
         if period == TaskPeriod.today:
             start = datetime.combine(today, time.min)
             end = datetime.combine(today, time.max)
+            filters.append(
+                and_(
+                    Tasks.start_at <= end,
+                    Tasks.deadline_at >= start,
+                    Tasks.is_completed == False,
+                )
+            )
 
         elif period == TaskPeriod.week:
             start_week = today - timedelta(days=today.weekday())
             end_week = start_week + timedelta(days=6)
-
             start = datetime.combine(start_week, time.min)
             end = datetime.combine(end_week, time.max)
-
-        filters.append(
-            and_(
-                Tasks.start_at <= end,
-                Tasks.deadline_at >= start
+            filters.append(
+                and_(
+                    Tasks.start_at <= end,
+                    Tasks.deadline_at >= start,
+                    Tasks.is_completed == False,
+                )
             )
-        )
+
+        elif period == TaskPeriod.overdue:
+            filters.append(
+                and_(
+                    Tasks.deadline_at < now,
+                    Tasks.is_completed == False,
+                )
+            )
+
+        # filters.append(
+        #     and_(
+        #         Tasks.start_at <= end,
+        #         Tasks.deadline_at >= start
+        #     )
+        # )
 
     stmt = stmt.where(*filters)
 

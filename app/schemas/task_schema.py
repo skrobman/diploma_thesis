@@ -47,6 +47,7 @@ class ReadCreatedTask(BaseModel):
     name: str
     description: str = None
     priority_name: str
+    is_completed: bool
     start_at: datetime
     deadline_at: datetime
     created_by: UserRead
@@ -62,6 +63,7 @@ class ReadTask(BaseModel):
     created_by: UserRead
     weight: int | None
     description: str
+    is_completed: bool
     start_at: datetime
     deadline_at: datetime
     members: list[TaskMemberRead]

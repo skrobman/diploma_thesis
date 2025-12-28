@@ -31,6 +31,7 @@ def build_read_task(task: Tasks) -> ReadTask:
         "priority_name": task.priority.name if task.priority else None,
         "task_name": task.name,
         "created_by": task.creator,
+        "is_completed": task.is_completed,
         "weight": task.priority.weight if task.priority else None,
         "description": task.description,
         "start_at": task.start_at,
@@ -143,6 +144,7 @@ async def create_task_service(
         start_at=task.start_at,
         deadline_at=task.deadline_at,
         created_by=UserRead.model_validate(creator),
+        is_completed=task.is_completed,
         members=[
             TaskMemberRead(
                 role=ut.role.name,
