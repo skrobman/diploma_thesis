@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,11 +6,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.dependencies import get_current_user
 from app.database import get_db
 from app.models.models import User
-from app.schemas.task_schema import ReadTask, AllTasksResponse, CreateTask, ReadCreatedTask
-from app.services.task_service import get_task_service, get_all_user_tasks_in_project_service, create_task_service
+from app.schemas.task_schema import ReadTask, AllTasksResponse, CreateTask, ReadCreatedTask, PrioritiesRead
+from app.services.task_service import get_task_service, get_all_user_tasks_in_project_service, create_task_service, \
+    get_all_priorities_service
 from app.utils.enums.enum_utils import TaskPeriod
 
 router = APIRouter(prefix="/tasks", tags=["Tasks / Общие"])
+
+@router.get(
+    "/priorities",
+    response_model=List[PrioritiesRead],
+    summary="Получить список приоритетов",
+    description="Возвращает список всех доступных приоритетов таски."
+)
+async def get_project_roles(db: AsyncSession = Depends(get_db)):
+    return await get_all_priorities_service(db=db)
 
 @router.post(
     "/create",

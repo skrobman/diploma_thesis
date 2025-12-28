@@ -6,10 +6,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import models
-from app.models.models import Tasks, UsersTasks
+from app.models.models import Tasks, UsersTasks, PriorityLevels
 from app.schemas.task_schema import CreateTask
-from app.utils.enums.enum_utils import TaskPeriod, TaskStatus
+from app.utils.enums.enum_utils import TaskPeriod
 
+async def get_all_priorities(
+        db: AsyncSession
+):
+    result = await db.execute(
+        select(PriorityLevels)
+    )
+
+    return result.scalars().all()
 
 async def get_task_by_id_repository(db: AsyncSession, task_id: int) -> Tasks:
     res = await db.execute(
@@ -24,6 +32,11 @@ async def get_task_by_id_repository(db: AsyncSession, task_id: int) -> Tasks:
     )
 
     return res.scalar_one_or_none()
+
+# async def get_all_user_tasks(
+#         db: AsyncSession,
+#         user_id: int,
+# ) -> List[Tasks]:
 
 async def get_all_user_tasks_from_project_repository(
     db: AsyncSession,

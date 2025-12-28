@@ -3,12 +3,12 @@ from typing import List, Dict
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.models import Tasks, User
+from app.models.models import Tasks, User, PriorityLevels
 from app.repositories.project_repository import get_project_by_id, is_user_member_of_project, get_project_member_by_id, \
     get_project_members_with_roles
 
 from app.repositories.task_repository import get_task_by_id_repository, is_user_task_member, \
-    get_all_user_tasks_from_project_repository, create_task_repository
+    get_all_user_tasks_from_project_repository, create_task_repository, get_all_priorities
 from app.schemas.task_schema import ReadTask, TaskMemberRead, AllTasksResponse, CreateTask, ReadCreatedTask
 from app.schemas.user_schema import UserRead
 from app.utils.enums.enum_utils import TaskPeriod
@@ -38,6 +38,13 @@ def build_read_task(task: Tasks) -> ReadTask:
         "deadline_at": task.deadline_at,
         "members": members
     })
+
+async def get_all_priorities_service(
+        db: AsyncSession,
+) -> List[PriorityLevels]:
+    return list(
+        await get_all_priorities(db)
+    )
 
 async def get_task_service(
     db: AsyncSession,

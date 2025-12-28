@@ -11,6 +11,11 @@ def today_start():
 def today_end():
     return datetime.now(timezone.utc).replace(hour=23, minute=59, second=59, microsecond=0)
 
+class PrioritiesRead(BaseModel):
+    id: int
+    name: str
+    weight: int
+
 class CreateTask(BaseModel):
     project_id: int
     name: str
