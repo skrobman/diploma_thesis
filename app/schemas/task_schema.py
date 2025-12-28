@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, time
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator, EmailStr
@@ -18,6 +18,7 @@ class CreateTask(BaseModel):
     description: str = None
     start_at: datetime = Field(default_factory=today_start)
     deadline_at: datetime = Field(default_factory=today_end)
+    deadline_time: time | None = None
     users: list[EmailStr] = []
 
     @field_validator('start_at', 'deadline_at')

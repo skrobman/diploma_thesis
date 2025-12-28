@@ -129,57 +129,63 @@ async def create_task_repository(
         members_with_roles: Dict[int, int]
 ) -> Tasks:
     try:
-        #Создаем задачу
-        task_payload = task_data.model_dump(exclude={'users'})
+        # Создаем payload из Pydantic-модели, исключая users
+        task_payload = task_data.model_dump(exclude={'users', 'deadline_time'})
 
-        # Начало и конец дня для UTC, если поля пустые
+        now_utc = datetime.now(timezone.utc)
+
+        # Если start_at не указан, ставим начало дня UTC
         if not task_payload.get("start_at"):
-            task_payload["start_at"] = datetime.combine(
-                datetime.now(timezone.utc).date(),
-                time.min,
+            start_at = datetime.combine(now_utc.date(), time.min, tzinfo=timezone.utc)
+        else:
+            start_at = task_payload["start_at"]
+
+        if task_data.deadline_time:
+            deadline_at = datetime.combine(
+                start_at.date(),
+                task_data.deadline_time,
                 tzinfo=timezone.utc
             )
-
-        if not task_payload.get("deadline_at"):
-            task_payload["deadline_at"] = datetime.combine(
-                datetime.now(timezone.utc).date(),
+        elif not task_payload.get("deadline_at"):
+            deadline_at = datetime.combine(
+                start_at.date(),
                 time.max,
                 tzinfo=timezone.utc
             )
+        else:
+            deadline_at = task_payload["deadline_at"]
 
+        task_payload["start_at"] = start_at
+        task_payload["deadline_at"] = deadline_at
+
+        # Создаём задачу
         new_task = Tasks(**task_payload)
         new_task.created_by = creator_id
-
         db.add(new_task)
         await db.flush()
 
-        #Добавляем участников
+        # Добавляем участников
         if members_with_roles:
-            participants_to_add = []
-            for uid, role_id in members_with_roles.items():
-                participants_to_add.append(
-                    UsersTasks(
-                        task_id=new_task.id,
-                        user_id=uid,
-                        role_id=role_id
-                    )
-                )
+            participants_to_add = [
+                UsersTasks(task_id=new_task.id, user_id=uid, role_id=role_id)
+                for uid, role_id in members_with_roles.items()
+            ]
             db.add_all(participants_to_add)
 
         await db.commit()
 
+        # Загружаем полностью задачу с участниками и связями
         stmt = (
             select(Tasks)
             .where(Tasks.id == new_task.id)
             .options(
                 selectinload(Tasks.creator),
                 selectinload(Tasks.task_users)
-                .selectinload(UsersTasks.user),
+                    .selectinload(UsersTasks.user),
                 selectinload(Tasks.task_users)
-                .selectinload(UsersTasks.role),
+                    .selectinload(UsersTasks.role),
             )
         )
-
         result = await db.execute(stmt)
         full_task = result.scalar_one()
 
