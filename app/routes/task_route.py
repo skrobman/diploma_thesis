@@ -61,7 +61,7 @@ async def get_tasks(
         None,
         description="Фильтр по приоритету (необязательный)"
     ),
-    period: TaskPeriod | None = Query(
+    filters: TaskPeriod | None = Query(
         None,
         description="Фильтр на today и week"
     ),
@@ -76,6 +76,6 @@ async def get_tasks(
         cursor=cursor,
         limit=limit,
         priority_id=priority_id,
-        period=period
+        period=filters
     )
 

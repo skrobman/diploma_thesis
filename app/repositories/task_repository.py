@@ -85,6 +85,17 @@ async def get_all_user_tasks_from_project_repository(
                     Tasks.is_completed == False,
                 )
             )
+        elif period == TaskPeriod.completed:
+            filters.append(
+                Tasks.is_completed == True
+            )
+        elif period == TaskPeriod.upcoming:
+            filters.append(
+                and_(
+                    Tasks.start_at > now,
+                    Tasks.is_completed == False,
+                )
+            )
 
         # filters.append(
         #     and_(
