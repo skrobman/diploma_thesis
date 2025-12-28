@@ -57,6 +57,7 @@ class CalendarTasksRead(BaseModel):
     start_at: datetime
     deadline_at: datetime
     is_overdue: bool = False
+    is_completed: bool
 
     model_config = {"from_attributes": True}
 

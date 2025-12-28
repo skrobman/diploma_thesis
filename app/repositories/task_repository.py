@@ -50,7 +50,8 @@ async def get_all_user_tasks_for_calendar(
             Tasks.description,
             Tasks.priority_id,
             Tasks.start_at,
-            Tasks.deadline_at
+            Tasks.deadline_at,
+            Tasks.is_completed
         )
         .join(UsersTasks, Tasks.id == UsersTasks.task_id)
         .where(
