@@ -1,13 +1,15 @@
+from datetime import date, timedelta, datetime, time
 from typing import List, Optional, Dict
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 
 from app.models import models
 from app.models.models import Tasks, UsersTasks
-from app.schemas.task_schema import ReadTask, CreateTask
+from app.schemas.task_schema import CreateTask
+from app.utils.enums.enum_utils import TaskPeriod
+
 
 async def get_task_by_id_repository(db: AsyncSession, task_id: int) -> Tasks:
     res = await db.execute(
@@ -28,8 +30,11 @@ async def get_all_user_tasks_from_project_repository(
     user_id: int,
     project_id: int,
     cursor: int = 0,
-    limit: int = 5
+    limit: int = 5,
+    priority_id: int | None = None,
+    period: TaskPeriod | None = None,
 ) -> list[Tasks]:
+
     stmt = (
         select(Tasks)
         .join(UsersTasks, Tasks.id == UsersTasks.task_id)
@@ -38,21 +43,51 @@ async def get_all_user_tasks_from_project_repository(
             UsersTasks.user_id == user_id,
             Tasks.id > cursor
         )
+    )
+
+    filters = []
+
+    if priority_id is not None:
+        filters.append(Tasks.priority_id == priority_id)
+
+    if period is not None:
+        today = date.today()
+
+        if period == TaskPeriod.today:
+            start = datetime.combine(today, time.min)
+            end = datetime.combine(today, time.max)
+
+        elif period == TaskPeriod.week:
+            start_week = today - timedelta(days=today.weekday())
+            end_week = start_week + timedelta(days=6)
+
+            start = datetime.combine(start_week, time.min)
+            end = datetime.combine(end_week, time.max)
+
+        filters.append(
+            and_(
+                Tasks.start_at <= end,
+                Tasks.deadline_at >= start
+            )
+        )
+
+    stmt = stmt.where(*filters)
+
+    stmt = (
+        stmt
         .order_by(Tasks.id.asc())
         .limit(limit)
         .options(
             selectinload(Tasks.creator),
             selectinload(Tasks.task_users)
-            .selectinload(UsersTasks.user),
+                .selectinload(UsersTasks.user),
             selectinload(Tasks.task_users)
-            .selectinload(UsersTasks.role),
+                .selectinload(UsersTasks.role),
         )
     )
 
     result = await db.execute(stmt)
-    tasks = result.scalars().unique().all()
-
-    return tasks
+    return result.scalars().unique().all()
 
 async def is_user_task_member(db: AsyncSession, task_id: int, user_id: int) -> bool:
     result = await db.execute(

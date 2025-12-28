@@ -11,6 +11,7 @@ from app.repositories.task_repository import get_task_by_id_repository, is_user_
     get_all_user_tasks_from_project_repository, create_task_repository
 from app.schemas.task_schema import ReadTask, TaskMemberRead, AllTasksResponse, CreateTask, ReadCreatedTask
 from app.schemas.user_schema import UserRead
+from app.utils.enums.enum_utils import TaskPeriod
 from app.utils.error_handler import handle_db_errors
 
 
@@ -56,9 +57,19 @@ async def get_all_user_tasks_in_project_service(
         user_id: int,
         project_id: int,
         cursor: int = 0,
-        limit: int = 5
+        limit: int = 5,
+        priority_id: int = None,
+        period: TaskPeriod | None = None,
 ) -> AllTasksResponse:
-    tasks = await get_all_user_tasks_from_project_repository(db, user_id, project_id, cursor, limit)
+    tasks = await get_all_user_tasks_from_project_repository(
+        db,
+        user_id,
+        project_id,
+        cursor,
+        limit,
+        priority_id,
+        period
+    )
 
     if not tasks:
         return AllTasksResponse(items=[], next_cursor=None)

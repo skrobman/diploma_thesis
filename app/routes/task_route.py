@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,6 +8,7 @@ from app.database import get_db
 from app.models.models import User
 from app.schemas.task_schema import ReadTask, AllTasksResponse, CreateTask, ReadCreatedTask
 from app.services.task_service import get_task_service, get_all_user_tasks_in_project_service, create_task_service
+from app.utils.enums.enum_utils import TaskPeriod
 
 router = APIRouter(prefix="/tasks", tags=["Tasks / Общие"])
 
@@ -54,6 +57,14 @@ async def get_tasks(
     project_id: int,
     cursor: int = Query(0, description="ID последней таски с предыдущей страницы"),
     limit: int = Query(5, le=10, description="Количество тацок на странице"),
+    priority_id: Optional[int] = Query(
+        None,
+        description="Фильтр по приоритету (необязательный)"
+    ),
+    period: TaskPeriod | None = Query(
+        None,
+        description="Фильтр на today и week"
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -63,6 +74,8 @@ async def get_tasks(
         user_id=current_user.id,
         project_id=project_id,
         cursor=cursor,
-        limit=limit
+        limit=limit,
+        priority_id=priority_id,
+        period=period
     )
 
