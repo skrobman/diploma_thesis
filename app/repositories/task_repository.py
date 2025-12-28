@@ -1,4 +1,4 @@
-from datetime import date, timedelta, datetime, time
+from datetime import date, timedelta, datetime, time, timezone
 from typing import List, Optional, Dict
 
 from sqlalchemy import select, func, and_
@@ -131,6 +131,22 @@ async def create_task_repository(
     try:
         #Создаем задачу
         task_payload = task_data.model_dump(exclude={'users'})
+
+        # Начало и конец дня для UTC, если поля пустые
+        if not task_payload.get("start_at"):
+            task_payload["start_at"] = datetime.combine(
+                datetime.now(timezone.utc).date(),
+                time.min,
+                tzinfo=timezone.utc
+            )
+
+        if not task_payload.get("deadline_at"):
+            task_payload["deadline_at"] = datetime.combine(
+                datetime.now(timezone.utc).date(),
+                time.max,
+                tzinfo=timezone.utc
+            )
+
         new_task = Tasks(**task_payload)
         new_task.created_by = creator_id
 
