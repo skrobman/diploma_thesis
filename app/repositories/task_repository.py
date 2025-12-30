@@ -259,3 +259,17 @@ async def get_task_priority(
         )
     )
     return result.scalars().first()
+
+async def get_task_member_by_id(
+        db: AsyncSession,
+        task_id: int,
+        user_id: int
+):
+    result = await db.execute(
+        select(UsersTasks).where(
+            UsersTasks.task_id == task_id,
+            UsersTasks.user_id == user_id
+        )
+    )
+
+    return result.scalars().first()

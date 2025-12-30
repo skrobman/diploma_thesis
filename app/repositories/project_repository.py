@@ -122,6 +122,19 @@ async def get_project_member_by_id(
 
     return result.scalars().first()
 
+async def get_project_owner(
+        db: AsyncSession,
+        project_id: int
+):
+    result = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.role_id == 1
+        )
+    )
+
+    return result.scalars().first()
+
 async def add_member_to_project(db:AsyncSession, schema: AddProjectMember):
     project_member = ProjectMember(
         project_id=schema.project_id,

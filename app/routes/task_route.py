@@ -7,9 +7,9 @@ from app.config.dependencies import get_current_user
 from app.database import get_db
 from app.models.models import User
 from app.schemas.task_schema import ReadTask, AllTasksResponse, CreateTask, ReadCreatedTask, PrioritiesRead, \
-    CalendarTasksRead
+    CalendarTasksRead, UpdateTask
 from app.services.task_service import get_task_service, get_all_user_tasks_in_project_service, create_task_service, \
-    get_all_priorities_service, get_all_calendar_tasks_service
+    get_all_priorities_service, get_all_calendar_tasks_service, update_task_service
 from app.utils.enums.enum_utils import TaskPeriod
 
 router = APIRouter(prefix="/tasks", tags=["Tasks / Общие"])
@@ -107,4 +107,23 @@ async def get_calendar_tasks(
         user_id=current_user.id,
         year=year,
         month=month,
+    )
+
+@router.patch(
+    '/update/{task_id}',
+    response_model=ReadTask,
+    summary="Изменение таски",
+    description="Все поля опциональные"
+)
+async def update_task(
+        task_id: int,
+        task_data: UpdateTask,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    return await update_task_service(
+        db=db,
+        task_id=task_id,
+        task_data=task_data,
+        user_id=current_user.id,
     )

@@ -6,14 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Tasks, User, PriorityLevels
 from app.repositories.project_repository import get_project_by_id, is_user_member_of_project, get_project_member_by_id, \
-    get_project_members_with_roles
+    get_project_members_with_roles, get_project_owner
 
 from app.repositories.task_repository import get_task_by_id_repository, is_user_task_member, \
     get_all_user_tasks_from_project_repository, create_task_repository, get_all_priorities, \
-    get_all_user_tasks_for_calendar
+    get_all_user_tasks_for_calendar, get_task_member_by_id
 from app.repositories.user_repository import get_user_by_id
 from app.schemas.task_schema import ReadTask, TaskMemberRead, AllTasksResponse, CreateTask, ReadCreatedTask, \
-    CalendarTasksRead
+    CalendarTasksRead, UpdateTask
 from app.schemas.user_schema import UserRead
 from app.utils.enums.enum_utils import TaskPeriod
 from app.utils.error_handler import handle_db_errors
@@ -34,7 +34,8 @@ def build_read_task(task: Tasks) -> ReadTask:
         "priority_id": task.priority_id,
         "priority_name": task.priority.name if task.priority else None,
         "task_name": task.name,
-        "created_by": task.creator,
+        "created_by": task.created_by,
+        "creator": task.creator,
         "is_completed": task.is_completed,
         "weight": task.priority.weight if task.priority else None,
         "description": task.description,
@@ -198,3 +199,78 @@ async def get_all_calendar_tasks_service(
         calendar_tasks.append(CalendarTasksRead.model_validate(task_dict))
 
     return calendar_tasks
+
+async def update_task_service(
+    db: AsyncSession,
+    task_data: UpdateTask,
+    task_id: int,
+    user_id: int,
+):
+    current_user = await get_user_by_id(db=db, user_id=user_id)
+    if not current_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    task = await get_task_by_id_repository(db=db, task_id=task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    project_member = await get_project_member_by_id(
+        db=db,
+        project_id=task.project_id,
+        user_id=user_id,
+    )
+
+    owner = await get_project_owner(
+        db=db,
+        project_id=task.project_id,
+    )
+
+    if not project_member:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if project_member.role_id == 1:
+        pass
+
+    elif task.created_by == user_id:
+        pass
+
+    elif project_member.role_id == 2:
+        if task.created_by == owner.user_id:
+            raise HTTPException(status_code=403, detail="Admins cannot modify owner's tasks")
+
+        task_member = await get_task_member_by_id(
+            db=db,
+            user_id=user_id,
+            task_id=task.id
+        )
+        if not task_member:
+            raise HTTPException(
+                status_code=403,
+                detail="Admin must be assigned to the task"
+            )
+
+    else:
+        raise HTTPException(status_code=403, detail="No permission")
+
+    update_data = task_data.model_dump(exclude_unset=True)
+
+    changed = False
+
+    for field, new_value in update_data.items():
+        old_value = getattr(task, field)
+
+        if new_value == old_value:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Field '{field}' must be different from the current value"
+            )
+        setattr(task, field, new_value)
+
+    if not changed:
+        return build_read_task(task)
+
+    await db.commit()
+
+    task = await get_task_by_id_repository(db=db, task_id=task.id)
+    return build_read_task(task)
+

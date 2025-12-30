@@ -85,7 +85,8 @@ class ReadTask(BaseModel):
     name: str
     priority_id: int
     priority_name: str | None = None
-    created_by: UserRead
+    created_by: int
+    creator: UserRead
     weight: int | None
     description: str
     is_completed: bool
@@ -100,3 +101,17 @@ class AllTasksResponse(BaseModel):
     next_cursor: Optional[int] = None
 
     model_config = {"from_attributes": True}
+
+class UpdateTask(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    priority_id: int | None = None
+    start_at: datetime | None = None
+    deadline_at: datetime | None = None
+
+    @field_validator("deadline_at")
+    def deadline_after_start(cls, v, info):
+        start = info.data.get("start_at")
+        if start and v and v < start:
+            raise ValueError("deadline_at must be after start_at")
+        return v
