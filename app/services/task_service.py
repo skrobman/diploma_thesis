@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Tasks, User, PriorityLevels
@@ -10,7 +11,7 @@ from app.repositories.project_repository import get_project_by_id, is_user_membe
 
 from app.repositories.task_repository import get_task_by_id_repository, is_user_task_member, \
     get_all_user_tasks_from_project_repository, create_task_repository, get_all_priorities, \
-    get_all_user_tasks_for_calendar, get_task_member_by_id
+    get_all_user_tasks_for_calendar, get_task_member_by_id, is_task_name_exists
 from app.repositories.user_repository import get_user_by_id
 from app.schemas.task_schema import ReadTask, TaskMemberRead, AllTasksResponse, CreateTask, ReadCreatedTask, \
     CalendarTasksRead, UpdateTask
@@ -256,6 +257,16 @@ async def update_task_service(
 
     update_data = task_data.model_dump(exclude_unset=True)
 
+    #Проверка на существование таски с таким же именем
+    new_name = update_data.get("name")
+    if new_name and new_name != task.name:
+        exists = await is_task_name_exists(db, task.project_id, new_name, exclude_task_id=task.id)
+        if exists:
+            raise HTTPException(
+                status_code=400,
+                detail=f"A task with the name '{new_name}' already exists in this project"
+            )
+
     changed = False
 
     for field, new_value in update_data.items():
@@ -267,6 +278,7 @@ async def update_task_service(
                 detail=f"Field '{field}' must be different from the current value"
             )
         setattr(task, field, new_value)
+        changed = True
 
     if not changed:
         return build_read_task(task)
@@ -275,4 +287,3 @@ async def update_task_service(
 
     task = await get_task_by_id_repository(db=db, task_id=task.id)
     return build_read_task(task)
-

@@ -256,3 +256,15 @@ async def get_task_member_by_id(
     )
 
     return result.scalars().first()
+
+async def is_task_name_exists(
+    db: AsyncSession,
+    project_id: int,
+    name: str,
+    exclude_task_id: int | None = None
+) -> bool:
+    stmt = select(Tasks).where(Tasks.project_id == project_id, Tasks.name == name)
+    if exclude_task_id:
+        stmt = stmt.where(Tasks.id != exclude_task_id)
+    result = await db.execute(stmt)
+    return bool(result.scalar_one_or_none())
