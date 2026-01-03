@@ -9,7 +9,7 @@ from app.models.models import User
 from app.schemas.task_schema import ReadTask, AllTasksResponse, CreateTask, ReadCreatedTask, PrioritiesRead, \
     CalendarTasksRead, UpdateTask
 from app.services.task_service import get_task_service, get_all_user_tasks_in_project_service, create_task_service, \
-    get_all_priorities_service, get_all_calendar_tasks_service, update_task_service
+    get_all_priorities_service, get_all_calendar_tasks_service, update_task_service, delete_task_service
 from app.utils.enums.enum_utils import TaskPeriod
 
 router = APIRouter(prefix="/tasks", tags=["Tasks / Общие"])
@@ -127,3 +127,15 @@ async def update_task(
         task_data=task_data,
         user_id=current_user.id,
     )
+
+@router.delete(
+    '/delete/{task_id}',
+    status_code=204,
+    summary="Удаление таски"
+)
+async def delete_task(
+        task_id: int,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    return await delete_task_service(db=db, task_id=task_id, user_id=current_user.id)

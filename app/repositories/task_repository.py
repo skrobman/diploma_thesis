@@ -1,7 +1,7 @@
 from datetime import date, timedelta, datetime, time, timezone
 from typing import List, Optional, Dict
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -268,3 +268,12 @@ async def is_task_name_exists(
         stmt = stmt.where(Tasks.id != exclude_task_id)
     result = await db.execute(stmt)
     return bool(result.scalar_one_or_none())
+
+async def delete_task_repository(
+    db: AsyncSession,
+    task_id: int,
+) -> bool:
+    stmt = delete(Tasks).where(Tasks.id == task_id)
+
+    result = await db.execute(stmt)
+    return result.rowcount > 0
