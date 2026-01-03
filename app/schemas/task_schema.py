@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, time
+from datetime import datetime, timezone, time, date
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator, EmailStr
@@ -21,26 +21,54 @@ class CreateTask(BaseModel):
     name: str
     priority_id: int
     description: str = None
-    start_at: datetime = Field(default_factory=today_start)
-    deadline_at: datetime = Field(default_factory=today_end)
+
+    start_at: datetime | None = None
+    start_date: date | None = None
+    start_time: time | None = None
+
+    deadline_at: datetime | None = None
+    deadline_date: date | None = None
     deadline_time: time | None = None
+
     users: list[EmailStr] = []
 
-    @field_validator('start_at', 'deadline_at')
-    def force_utc(cls, v: datetime):
-        #Если фронт прислал время без зоны, считаем, что это UTC
-        if v.tzinfo is None:
-            return v.replace(tzinfo=timezone.utc)
+    without_time: bool = False
 
-        # Если фронт прислал время с зоной - переводим в UTC,
-        # переводим его в UTC
-        return v.astimezone(timezone.utc)
+    @model_validator(mode="after")
+    def compute_datetimes(cls, values: "CreateTask"):
+        # Если пришли datetime
+        if values.start_at and values.deadline_at:
+            values.without_time = False
+            return values
 
-    @model_validator(mode='after')
-    def check_dates_order(self):
-        if self.start_at > self.deadline_at:
-            raise ValueError('Deadline must be after start')
-        return self
+        # Если есть только start_date
+        start_date = values.start_date
+        start_time = values.start_time
+        deadline_date = values.deadline_date or start_date
+        deadline_time = values.deadline_time
+
+        if not start_date:
+            raise ValueError("start_date must be provided if start_at not sent")
+
+        # start_at
+        start_at = datetime.combine(start_date, start_time or time.min, tzinfo=timezone.utc)
+        values.start_at = start_at
+
+        # deadline_at
+        if deadline_time:
+            deadline_at = datetime.combine(deadline_date, deadline_time, tzinfo=timezone.utc)
+            values.without_time = False
+        else:
+            deadline_at = datetime.combine(deadline_date, time.max, tzinfo=timezone.utc)
+            values.without_time = True
+
+        values.deadline_at = deadline_at
+
+        # если start_time есть → без времени нет
+        if start_time:
+            values.without_time = False
+
+        return values
 
 class TaskMemberRead(BaseModel):
     role: str
@@ -76,6 +104,7 @@ class ReadCreatedTask(BaseModel):
     start_at: datetime
     deadline_at: datetime
     created_by: UserRead
+    without_time: bool
     members: list[TaskMemberRead]
 
     model_config = {"from_attributes": True}
@@ -90,6 +119,7 @@ class ReadTask(BaseModel):
     weight: int | None
     description: str
     is_completed: bool
+    without_time: bool
     start_at: datetime
     deadline_at: datetime
     members: list[TaskMemberRead]

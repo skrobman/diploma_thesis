@@ -175,60 +175,43 @@ async def is_user_task_member(db: AsyncSession, task_id: int, user_id: int) -> b
     )
     return result.scalar_one_or_none() is not None
 
-
 async def create_task_repository(
-        db: AsyncSession,
-        task_data: CreateTask,
-        creator_id: int,
-        members_with_roles: Dict[int, int]
+    db: AsyncSession,
+    task_data: CreateTask,
+    creator_id: int,
+    members_with_roles: Dict[int, int],
 ) -> Tasks:
     try:
-        # Создаем payload из Pydantic-модели, исключая users
-        task_payload = task_data.model_dump(exclude={'users', 'deadline_time'})
+        task_payload = task_data.model_dump(
+            exclude={
+                "users",
+                "start_date",
+                "start_time",
+                "deadline_date",
+                "deadline_time",
+            }
+        )
 
-        now_utc = datetime.now(timezone.utc)
-
-        # Если start_at не указан, ставим начало дня UTC
-        if not task_payload.get("start_at"):
-            start_at = datetime.combine(now_utc.date(), time.min, tzinfo=timezone.utc)
-        else:
-            start_at = task_payload["start_at"]
-
-        if task_data.deadline_time:
-            deadline_at = datetime.combine(
-                start_at.date(),
-                task_data.deadline_time,
-                tzinfo=timezone.utc
-            )
-        elif not task_payload.get("deadline_at"):
-            deadline_at = datetime.combine(
-                start_at.date(),
-                time.max,
-                tzinfo=timezone.utc
-            )
-        else:
-            deadline_at = task_payload["deadline_at"]
-
-        task_payload["start_at"] = start_at
-        task_payload["deadline_at"] = deadline_at
-
-        # Создаём задачу
         new_task = Tasks(**task_payload)
         new_task.created_by = creator_id
+
         db.add(new_task)
         await db.flush()
 
-        # Добавляем участников
         if members_with_roles:
-            participants_to_add = [
-                UsersTasks(task_id=new_task.id, user_id=uid, role_id=role_id)
-                for uid, role_id in members_with_roles.items()
-            ]
-            db.add_all(participants_to_add)
+            db.add_all(
+                [
+                    UsersTasks(
+                        task_id=new_task.id,
+                        user_id=user_id,
+                        role_id=role_id,
+                    )
+                    for user_id, role_id in members_with_roles.items()
+                ]
+            )
 
         await db.commit()
 
-        # Загружаем полностью задачу с участниками и связями
         stmt = (
             select(Tasks)
             .where(Tasks.id == new_task.id)
@@ -240,14 +223,14 @@ async def create_task_repository(
                     .selectinload(UsersTasks.role),
             )
         )
+
         result = await db.execute(stmt)
-        full_task = result.scalar_one()
+        return result.scalar_one()
 
-        return full_task
-
-    except Exception as e:
+    except Exception:
         await db.rollback()
-        raise e
+        raise
+
 
 async def get_task_priority(
         db: AsyncSession,

@@ -37,6 +37,7 @@ def build_read_task(task: Tasks) -> ReadTask:
         "created_by": task.created_by,
         "creator": task.creator,
         "is_completed": task.is_completed,
+        "without_time": task.without_time,
         "weight": task.priority.weight if task.priority else None,
         "description": task.description,
         "start_at": task.start_at,
@@ -111,7 +112,7 @@ async def create_task_service(
     )
     if not initiator:
         raise HTTPException(status_code=403, detail="You are not a member of this project")
-    if initiator.role_id == 3: # Пример проверки прав
+    if initiator.role_id == 3:
         raise HTTPException(status_code=403, detail="No permission")
 
     final_members_map: Dict[int, int] = {
@@ -156,6 +157,7 @@ async def create_task_service(
         start_at=task.start_at,
         deadline_at=task.deadline_at,
         created_by=UserRead.model_validate(creator),
+        without_time=task.without_time,
         is_completed=task.is_completed,
         members=[
             TaskMemberRead(
