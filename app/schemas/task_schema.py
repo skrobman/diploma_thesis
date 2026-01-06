@@ -151,3 +151,7 @@ class UpdateTask(BaseModel):
 class AddUserToTask(BaseModel):
     user_emails: list[EmailStr]
     task_id: int
+
+class RemoveUserFromTask(BaseModel):
+    task_id: int
+    user_emails: list[EmailStr]

@@ -292,3 +292,19 @@ async def add_user_to_task_repository(
     )
 
     db.add(stmt)
+
+async def remove_user_from_task_repository(
+    db: AsyncSession,
+    task_id: int,
+    user_id: int,
+) -> bool:
+    stmt = (
+        delete(UsersTasks)
+        .where(
+            UsersTasks.task_id == task_id,
+            UsersTasks.user_id == user_id,
+        )
+    )
+
+    result = await db.execute(stmt)
+    return result.rowcount > 0

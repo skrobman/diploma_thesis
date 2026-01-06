@@ -12,10 +12,10 @@ from app.repositories.project_repository import get_project_by_id, is_user_membe
 from app.repositories.task_repository import get_task_by_id_repository, is_user_task_member, \
     get_all_user_tasks_from_project_repository, create_task_repository, get_all_priorities, \
     get_all_user_tasks_for_calendar, get_task_member_by_id, is_task_name_exists, delete_task_repository, \
-    add_user_to_task_repository
+    add_user_to_task_repository, remove_user_from_task_repository
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 from app.schemas.task_schema import ReadTask, TaskMemberRead, AllTasksResponse, CreateTask, ReadCreatedTask, \
-    CalendarTasksRead, UpdateTask, AddUserToTask
+    CalendarTasksRead, UpdateTask, AddUserToTask, RemoveUserFromTask
 from app.schemas.user_schema import UserRead
 from app.utils.enums.enum_utils import TaskPeriod
 from app.utils.error_handler import handle_db_errors
@@ -430,3 +430,74 @@ async def add_user_to_task_service(
     await db.commit()
 
     return {"msg": "SUCCESS"}
+
+async def remove_user_from_task_service(
+    db: AsyncSession,
+    user_id: int,
+    data: RemoveUserFromTask,
+):
+    current_user = await get_user_by_id(db, user_id)
+    if not current_user:
+        raise HTTPException(404, "User not found")
+
+    task = await get_task_by_id_repository(db, data.task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+
+    project_member = await get_project_member_by_id(
+        db=db,
+        project_id=task.project_id,
+        user_id=user_id,
+    )
+
+    owner = await get_project_owner(db, task.project_id)
+
+    if not project_member or project_member.role_id not in (1, 2):
+        raise HTTPException(403, "No permission")
+
+    removed_any = False
+
+    for email in data.user_emails:
+        user_to_remove = await get_user_by_email(db, email)
+        if not user_to_remove:
+            continue
+
+        # нельзя удалить себя
+        if user_to_remove.id == user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="You cannot remove yourself from the task"
+            )
+
+        # админ не может трогать таску owner’а
+        if project_member.role_id == 2 and task.created_by == owner.user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Admin cannot remove users from a task created by the project owner"
+            )
+
+        task_member = await get_task_member_by_id(
+            db=db,
+            user_id=user_to_remove.id,
+            task_id=task.id,
+        )
+        if not task_member:
+            continue
+
+        deleted = await remove_user_from_task_repository(
+            db=db,
+            task_id=task.id,
+            user_id=user_to_remove.id,
+        )
+
+        if deleted:
+            removed_any = True
+
+    if not removed_any:
+        raise HTTPException(
+            status_code=400,
+            detail="No users were removed from the task"
+        )
+
+    await db.commit()
+
