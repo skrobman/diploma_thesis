@@ -147,3 +147,7 @@ class UpdateTask(BaseModel):
         if start and v and v < start:
             raise ValueError("deadline_at must be after start_at")
         return v
+
+class AddUserToTask(BaseModel):
+    user_emails: list[EmailStr]
+    task_id: int

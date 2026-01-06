@@ -11,10 +11,11 @@ from app.repositories.project_repository import get_project_by_id, is_user_membe
 
 from app.repositories.task_repository import get_task_by_id_repository, is_user_task_member, \
     get_all_user_tasks_from_project_repository, create_task_repository, get_all_priorities, \
-    get_all_user_tasks_for_calendar, get_task_member_by_id, is_task_name_exists, delete_task_repository
-from app.repositories.user_repository import get_user_by_id
+    get_all_user_tasks_for_calendar, get_task_member_by_id, is_task_name_exists, delete_task_repository, \
+    add_user_to_task_repository
+from app.repositories.user_repository import get_user_by_id, get_user_by_email
 from app.schemas.task_schema import ReadTask, TaskMemberRead, AllTasksResponse, CreateTask, ReadCreatedTask, \
-    CalendarTasksRead, UpdateTask
+    CalendarTasksRead, UpdateTask, AddUserToTask
 from app.schemas.user_schema import UserRead
 from app.utils.enums.enum_utils import TaskPeriod
 from app.utils.error_handler import handle_db_errors
@@ -348,3 +349,84 @@ async def delete_task_service(
 
     await db.commit()
 
+@handle_db_errors
+async def add_user_to_task_service(
+    db: AsyncSession,
+    user_id: int,
+    data: AddUserToTask
+):
+    current_user = await get_user_by_id(db, user_id)
+    if not current_user:
+        raise HTTPException(404, "User not found")
+
+    task = await get_task_by_id_repository(db, data.task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+
+    project_member = await get_project_member_by_id(
+        db=db,
+        project_id=task.project_id,
+        user_id=user_id,
+    )
+
+    owner = await get_project_owner(db, task.project_id)
+
+    if not project_member or project_member.role_id not in (1, 2):
+        raise HTTPException(403, "No permission")
+
+    added_any = False
+
+    for email in data.user_emails:
+        user_to_add = await get_user_by_email(db, email)
+        if not user_to_add:
+            continue
+
+        if user_to_add.id == user_id:
+            raise HTTPException(
+                status_code=400,
+                detail="You cannot assign yourself to a task"
+            )
+
+        if project_member.role_id == 2 and user_to_add.id == owner.user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Admin cannot assign project owner"
+            )
+
+        target_project_member = await get_project_member_by_id(
+            db=db,
+            project_id=task.project_id,
+            user_id=user_to_add.id,
+        )
+        if not target_project_member:
+            continue
+
+        task_member = await get_task_member_by_id(
+            db=db,
+            user_id=user_to_add.id,
+            task_id=task.id,
+        )
+        if task_member:
+            raise HTTPException(
+                status_code=400,
+                detail=f"User {email} is already assigned to the task"
+            )
+
+        await add_user_to_task_repository(
+            db=db,
+            user_id=user_to_add.id,
+            task_id=task.id,
+            role_id=target_project_member.role_id,
+        )
+
+        added_any = True
+
+    if not added_any:
+        raise HTTPException(
+            status_code=400,
+            detail="No users were added to the task"
+        )
+
+    await db.commit()
+
+    return {"msg": "SUCCESS"}

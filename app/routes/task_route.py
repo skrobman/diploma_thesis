@@ -7,9 +7,10 @@ from app.config.dependencies import get_current_user
 from app.database import get_db
 from app.models.models import User
 from app.schemas.task_schema import ReadTask, AllTasksResponse, CreateTask, ReadCreatedTask, PrioritiesRead, \
-    CalendarTasksRead, UpdateTask
+    CalendarTasksRead, UpdateTask, AddUserToTask
 from app.services.task_service import get_task_service, get_all_user_tasks_in_project_service, create_task_service, \
-    get_all_priorities_service, get_all_calendar_tasks_service, update_task_service, delete_task_service
+    get_all_priorities_service, get_all_calendar_tasks_service, update_task_service, delete_task_service, \
+    add_user_to_task_service
 from app.utils.enums.enum_utils import TaskPeriod
 
 router = APIRouter(prefix="/tasks", tags=["Tasks / Общие"])
@@ -139,3 +140,19 @@ async def delete_task(
         current_user: User = Depends(get_current_user),
 ):
     return await delete_task_service(db=db, task_id=task_id, user_id=current_user.id)
+
+@router.post(
+    '/add-user-to-task',
+    status_code=201,
+    summary='Добавление участника на таску'
+)
+async def add_user_to_task(
+        data: AddUserToTask,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    return await add_user_to_task_service(
+        db=db,
+        data=data,
+        user_id=current_user.id,
+    )

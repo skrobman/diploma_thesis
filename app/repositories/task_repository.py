@@ -278,3 +278,17 @@ async def delete_task_repository(
 
     result = await db.execute(stmt)
     return result.rowcount > 0
+
+async def add_user_to_task_repository(
+        db: AsyncSession,
+        user_id: int,
+        task_id: int,
+        role_id: int,
+):
+    stmt = UsersTasks(
+        task_id=task_id,
+        user_id=user_id,
+        role_id=role_id,
+    )
+
+    db.add(stmt)
