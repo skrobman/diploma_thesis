@@ -15,7 +15,7 @@ from app.repositories.task_repository import get_task_by_id_repository, is_user_
     add_user_to_task_repository, remove_user_from_task_repository
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 from app.schemas.task_schema import ReadTask, TaskMemberRead, AllTasksResponse, CreateTask, ReadCreatedTask, \
-    CalendarTasksRead, UpdateTask, AddUserToTask, RemoveUserFromTask
+    CalendarTasksRead, UpdateTask, AddUserToTask, RemoveUserFromTask, TaskArchive
 from app.schemas.user_schema import UserRead
 from app.utils.enums.enum_utils import TaskPeriod
 from app.utils.error_handler import handle_db_errors
@@ -501,3 +501,58 @@ async def remove_user_from_task_service(
 
     await db.commit()
 
+async def toggle_task_archive_service(
+    db: AsyncSession,
+    data: TaskArchive,
+    user_id: int,
+):
+    current_user = await get_user_by_id(db, user_id)
+    if not current_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    task = await get_task_by_id_repository(db, data.task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    project_member = await get_project_member_by_id(
+        db=db,
+        project_id=task.project_id,
+        user_id=user_id,
+    )
+    owner = await get_project_owner(db, task.project_id)
+
+    if not project_member:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # только owner и админ могут архивировать/деархивировать
+    if project_member.role_id not in (1, 2):
+        raise HTTPException(status_code=403, detail="No permission")
+
+    # Админ не может архивировать/деархивировать таску, созданную owner’ом
+    if project_member.role_id == 2 and task.created_by == owner.user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin cannot archive/unarchive a task created by the project owner"
+        )
+
+    if data.archive and task.is_completed:
+        raise HTTPException(
+            status_code=400,
+            detail="Task is already archived"
+        )
+    if not data.archive and not task.is_completed:
+        raise HTTPException(
+            status_code=400,
+            detail="Task is already unarchived"
+        )
+
+    task.is_completed = data.archive
+
+    await db.commit()
+    await db.refresh(task)
+
+    return {
+        "task_id": task.id,
+        "is_completed": task.is_completed,
+        "msg": "Task archived" if data.archive else "Task unarchived"
+    }

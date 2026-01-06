@@ -155,3 +155,7 @@ class AddUserToTask(BaseModel):
 class RemoveUserFromTask(BaseModel):
     task_id: int
     user_emails: list[EmailStr]
+
+class TaskArchive(BaseModel):
+    task_id: int
+    archive: bool
