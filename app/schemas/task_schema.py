@@ -114,6 +114,8 @@ class ReadTask(BaseModel):
     name: str
     priority_id: int
     priority_name: str | None = None
+    project_id: int
+    project_name: str
     created_by: int
     creator: UserRead
     weight: int | None

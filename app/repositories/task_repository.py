@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import models
-from app.models.models import Tasks, UsersTasks, PriorityLevels
+from app.models.models import Tasks, UsersTasks, PriorityLevels, Project
 from app.schemas.task_schema import CreateTask, CalendarTasksRead
 from app.utils.enums.enum_utils import TaskPeriod
 
@@ -24,6 +24,7 @@ async def get_task_by_id_repository(db: AsyncSession, task_id: int) -> Tasks:
         select(Tasks)
         .where(Tasks.id == task_id)
         .options(
+            selectinload(Tasks.project).load_only(Project.name),
             selectinload(Tasks.task_users)
             .selectinload(UsersTasks.user),
             selectinload(Tasks.task_users)

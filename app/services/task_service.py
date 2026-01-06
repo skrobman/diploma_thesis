@@ -33,6 +33,8 @@ def build_read_task(task: Tasks) -> ReadTask:
         "id": task.id,
         "name": task.name,
         "priority_id": task.priority_id,
+        "project_id": task.project_id,
+        "project_name": task.project.name,
         "priority_name": task.priority.name if task.priority else None,
         "task_name": task.name,
         "created_by": task.created_by,

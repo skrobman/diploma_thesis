@@ -101,6 +101,12 @@ class Project(Base):
     purpose = relationship("ProjectPurposes", back_populates="projects")
     invitation_tokens = relationship("ProjectInvitationTokens", back_populates="project", passive_deletes=True)
 
+    tasks = relationship(
+        "Tasks",
+        back_populates="project",
+        cascade="all, delete-orphan"
+    )
+
 class ProjectMember(Base):
     __tablename__ = 'project_members'
     id = Column(Integer, primary_key=True)
@@ -165,6 +171,12 @@ class Tasks(Base):
     __tablename__ = 'tasks'
     id = Column(Integer, primary_key=True)
     project_id = Column(Integer, ForeignKey('projects.id'), nullable=False)
+
+    project = relationship(
+        "Project",
+        back_populates="tasks",
+        lazy="selectin"
+    )
 
     priority_id = Column(Integer, ForeignKey('priority_levels.id', ondelete='CASCADE'), nullable=False)
 
