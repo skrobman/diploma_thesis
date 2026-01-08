@@ -80,20 +80,22 @@ class CalendarTasksRead(BaseModel):
     project_id: int
     task_id: int
     name: str
-    description: str
+    description: str | None = None
     priority_id: int
     start_at: datetime
     deadline_at: datetime
-    is_overdue: bool = False
     is_completed: bool
+    is_overdue: bool = False
 
     model_config = {"from_attributes": True}
 
     @model_validator(mode="after")
-    def compute_is_overdue(cls, values):
-        # values — это объект модели
-        values.is_overdue = values.deadline_at < datetime.now(timezone.utc)
-        return values
+    def compute_is_overdue(self):
+        self.is_overdue = (
+            not self.is_completed
+            and self.deadline_at < datetime.now(timezone.utc)
+        )
+        return self
 
 class ReadCreatedTask(BaseModel):
     project_id: int
