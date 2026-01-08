@@ -212,37 +212,48 @@ async def update_task_service(
     task_id: int,
     user_id: int,
 ):
+    # ---------- USER ----------
     current_user = await get_user_by_id(db=db, user_id=user_id)
     if not current_user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # ---------- TASK ----------
     task = await get_task_by_id_repository(db=db, task_id=task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    # ---------- PROJECT PERMISSIONS ----------
     project_member = await get_project_member_by_id(
         db=db,
         project_id=task.project_id,
         user_id=user_id,
     )
+    if not project_member:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     owner = await get_project_owner(
         db=db,
         project_id=task.project_id,
     )
 
-    if not project_member:
-        raise HTTPException(status_code=403, detail="Access denied")
+    # ---------- ACCESS CONTROL ----------
+    allowed = False
 
+    # owner
     if project_member.role_id == 1:
-        pass
+        allowed = True
 
+    # task creator
     elif task.created_by == user_id:
-        pass
+        allowed = True
 
+    # admin
     elif project_member.role_id == 2:
         if task.created_by == owner.user_id:
-            raise HTTPException(status_code=403, detail="Admins cannot modify owner's tasks")
+            raise HTTPException(
+                status_code=403,
+                detail="Admins cannot modify owner's tasks"
+            )
 
         task_member = await get_task_member_by_id(
             db=db,
@@ -254,24 +265,46 @@ async def update_task_service(
                 status_code=403,
                 detail="Admin must be assigned to the task"
             )
+        allowed = True
 
-    else:
+    if not allowed:
         raise HTTPException(status_code=403, detail="No permission")
 
+    # ---------- UPDATE DATA ----------
     update_data = task_data.model_dump(exclude_unset=True)
 
-    #Проверка на существование таски с таким же именем
+    # НЕ затираем None (PATCH semantics)
+    update_data = {
+        key: value
+        for key, value in update_data.items()
+        if value is not None
+    }
+
+    if not update_data:
+        return build_read_task(task)
+
+    # ---------- UNIQUE NAME CHECK ----------
     new_name = update_data.get("name")
     if new_name and new_name != task.name:
-        exists = await is_task_name_exists(db, task.project_id, new_name, exclude_task_id=task.id)
+        exists = await is_task_name_exists(
+            db=db,
+            project_id=task.project_id,
+            name=new_name,
+            exclude_task_id=task.id,
+        )
         if exists:
             raise HTTPException(
                 status_code=400,
                 detail=f"A task with the name '{new_name}' already exists in this project"
             )
-    await db.commit()
 
-    task = await get_task_by_id_repository(db=db, task_id=task.id)
+    # ---------- APPLY UPDATE ----------
+    for field, value in update_data.items():
+        setattr(task, field, value)
+
+    await db.commit()
+    await db.refresh(task)
+
     return build_read_task(task)
 
 async def delete_task_service(
