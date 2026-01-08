@@ -309,3 +309,16 @@ async def remove_user_from_task_repository(
 
     result = await db.execute(stmt)
     return result.rowcount > 0
+
+async def get_task_by_name_in_project_repository(
+    db: AsyncSession,
+    project_id: int,
+    task_name: str
+) -> Tasks | None:
+    result = await db.execute(
+        select(Tasks).where(
+            Tasks.project_id == project_id,
+            Tasks.name == task_name
+        )
+    )
+    return result.scalar_one_or_none()

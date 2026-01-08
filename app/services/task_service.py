@@ -12,7 +12,7 @@ from app.repositories.project_repository import get_project_by_id, is_user_membe
 from app.repositories.task_repository import get_task_by_id_repository, is_user_task_member, \
     get_all_user_tasks_from_project_repository, create_task_repository, get_all_priorities, \
     get_all_user_tasks_for_calendar, get_task_member_by_id, is_task_name_exists, delete_task_repository, \
-    add_user_to_task_repository, remove_user_from_task_repository
+    add_user_to_task_repository, remove_user_from_task_repository, get_task_by_name_in_project_repository
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 from app.schemas.task_schema import ReadTask, TaskMemberRead, AllTasksResponse, CreateTask, ReadCreatedTask, \
     CalendarTasksRead, UpdateTask, AddUserToTask, RemoveUserFromTask, TaskArchive
@@ -118,6 +118,15 @@ async def create_task_service(
         raise HTTPException(status_code=403, detail="You are not a member of this project")
     if initiator.role_id == 3:
         raise HTTPException(status_code=403, detail="No permission")
+
+    existing_task = await get_task_by_name_in_project_repository(
+        db, task_data.project_id, task_data.name
+    )
+    if existing_task:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A task with the name '{task_data.name}' already exists in this project"
+        )
 
     final_members_map: Dict[int, int] = {
         user_id: initiator.role_id
