@@ -20,55 +20,84 @@ class CreateTask(BaseModel):
     project_id: int
     name: str
     priority_id: int
-    description: str = None
+    description: str | None = None
 
     start_at: datetime | None = None
+    deadline_at: datetime | None = None
+
     start_date: date | None = None
     start_time: time | None = None
 
-    deadline_at: datetime | None = None
     deadline_date: date | None = None
     deadline_time: time | None = None
 
+    without_time: bool = False
     users: list[EmailStr] = []
 
-    without_time: bool = False
-
     @model_validator(mode="after")
-    def compute_datetimes(cls, values: "CreateTask"):
-        # Если пришли datetime
-        if values.start_at and values.deadline_at:
-            values.without_time = False
-            return values
+    def compute_datetimes(self):
+        # ===== without_time = TRUE =====
+        if self.without_time:
+            if not self.start_date:
+                raise ValueError("start_date is required when without_time=true")
 
-        # Если есть только start_date
-        start_date = values.start_date
-        start_time = values.start_time
-        deadline_date = values.deadline_date or start_date
-        deadline_time = values.deadline_time
+            if any([self.start_time, self.deadline_time, self.start_at, self.deadline_at]):
+                raise ValueError(
+                    "Time or datetime fields are not allowed when without_time=true"
+                )
 
-        if not start_date:
-            raise ValueError("start_date must be provided if start_at not sent")
+            deadline_date = self.deadline_date or self.start_date
 
-        # start_at
-        start_at = datetime.combine(start_date, start_time or time.min, tzinfo=timezone.utc)
-        values.start_at = start_at
+            self.start_at = datetime.combine(
+                self.start_date,
+                time.min,
+                tzinfo=timezone.utc
+            )
+            self.deadline_at = datetime.combine(
+                deadline_date,
+                time.max,
+                tzinfo=timezone.utc
+            )
 
-        # deadline_at
-        if deadline_time:
-            deadline_at = datetime.combine(deadline_date, deadline_time, tzinfo=timezone.utc)
-            values.without_time = False
-        else:
-            deadline_at = datetime.combine(deadline_date, time.max, tzinfo=timezone.utc)
-            values.without_time = True
+            return self
 
-        values.deadline_at = deadline_at
+        # ===== without_time = FALSE =====
 
-        # если start_time есть → без времени нет
-        if start_time:
-            values.without_time = False
+        # 🔹 Вариант 1: через datetime
+        if self.start_at or self.deadline_at:
+            if not (self.start_at and self.deadline_at):
+                raise ValueError("Both start_at and deadline_at must be provided")
 
-        return values
+            if self.start_at >= self.deadline_at:
+                raise ValueError("deadline_at must be after start_at")
+
+            return self
+
+        # 🔹 Вариант 2: через date / time
+        if not self.start_date:
+            raise ValueError("start_date must be provided")
+
+        start_time = self.start_time or time.min
+        deadline_date = self.deadline_date or self.start_date
+        deadline_time = self.deadline_time or time.max
+
+        self.start_at = datetime.combine(
+            self.start_date,
+            start_time,
+            tzinfo=timezone.utc
+        )
+
+        self.deadline_at = datetime.combine(
+            deadline_date,
+            deadline_time,
+            tzinfo=timezone.utc
+        )
+
+        if self.start_at >= self.deadline_at:
+            raise ValueError("deadline_at must be after start_at")
+
+        return self
+
 
 class TaskMemberRead(BaseModel):
     role: str
