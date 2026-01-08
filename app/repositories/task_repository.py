@@ -24,7 +24,8 @@ async def get_task_by_id_repository(db: AsyncSession, task_id: int) -> Tasks:
         select(Tasks)
         .where(Tasks.id == task_id)
         .options(
-            selectinload(Tasks.project).load_only(Project.name),
+            selectinload(Tasks.project),
+            selectinload(Tasks.priority),
             selectinload(Tasks.task_users)
             .selectinload(UsersTasks.user),
             selectinload(Tasks.task_users)
