@@ -171,6 +171,7 @@ class UpdateTask(BaseModel):
     priority_id: int | None = None
     start_at: datetime | None = None
     deadline_at: datetime | None = None
+    without_time: bool | None = None
 
     @field_validator("deadline_at")
     def deadline_after_start(cls, v, info):
