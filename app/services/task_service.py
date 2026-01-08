@@ -129,12 +129,21 @@ async def create_task_service(
         )
 
     final_members_map: Dict[int, int] = {
-        user_id: initiator.role_id
+        user_id: initiator.role_id  # создатель автоматически добавляется
     }
 
     if task_data.users:
+        # Преобразуем все emails в нижний регистр и убираем пробелы
         requested_emails = {str(e).lower().strip() for e in task_data.users}
 
+        # Проверка: нельзя добавить себя
+        if initiator.user.email.lower() in requested_emails:
+            raise HTTPException(
+                status_code=400,
+                detail="You cannot add yourself to the task"
+            )
+
+        # Получаем пользователей с ролями
         found_users_map = await get_project_members_with_roles(
             db=db,
             project_id=task_data.project_id,
