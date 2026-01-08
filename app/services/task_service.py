@@ -270,21 +270,21 @@ async def update_task_service(
                 detail=f"A task with the name '{new_name}' already exists in this project"
             )
 
-    changed = False
-
-    for field, new_value in update_data.items():
-        old_value = getattr(task, field)
-
-        if new_value == old_value:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Field '{field}' must be different from the current value"
-            )
-        setattr(task, field, new_value)
-        changed = True
-
-    if not changed:
-        return build_read_task(task)
+    # changed = False
+    #
+    # for field, new_value in update_data.items():
+    #     old_value = getattr(task, field)
+    #
+    #     if new_value == old_value:
+    #         raise HTTPException(
+    #             status_code=400,
+    #             detail=f"Field '{field}' must be different from the current value"
+    #         )
+    #     setattr(task, field, new_value)
+    #     changed = True
+    #
+    # if not changed:
+    #     return build_read_task(task)
 
     await db.commit()
 
