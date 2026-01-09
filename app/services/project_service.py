@@ -15,13 +15,12 @@ from app.redis_client import redis_client
 from app.models import models
 from app.models.models import ProjectInvitationTokens, User
 from app.repositories.token_repositories.invitation_token_repository import save_invitation_token, get_invitation_token, \
-    delete_invitation_token, get_user_invite_token, delete_invite_token_by_obj
+    get_user_invite_token, revoke_invitation_token
 from app.repositories.project_repository import get_project_purpose, check_existing_project, create_project_repository, \
     get_all_project_purposes_repository, add_member_to_project, get_project_by_id, \
     get_all_projects, is_user_member_of_project, update_project_repository, get_all_project_roles_repository, \
     delete_project_repository, get_project_member_by_id, change_participant_role, update_project_archive_status, \
-    delete_user_from_project_by_id, get_all_project_members_repository, get_total_of_projects_non_arch, \
-    get_total_of_projects_arch, transfer_ownership, has_active_invite
+    delete_user_from_project_by_id, get_all_project_members_repository, get_total_of_projects_non_arch, transfer_ownership, has_active_invite
 from app.repositories.user_repository import get_user_by_id, get_user_by_email
 
 from app.schemas.project_schema import CreateProject, AddProjectMember, AllProjectsResponse, ProjectRead, UpdateProject, \
@@ -202,6 +201,12 @@ async def check_invite(
     if not invite:
         raise HTTPException(400, "Invalid or expired invite")
 
+    if invite.is_revoked:
+        raise HTTPException(
+            status_code=400,
+            detail="Token is revoked"
+        )
+
     return invite
 
 @handle_db_errors
@@ -217,6 +222,12 @@ async def join_to_project(
         raise HTTPException(
             status_code=400,
             detail="Invalid token"
+        )
+
+    if token.is_revoked:
+        raise HTTPException(
+            status_code=400,
+            detail="Token is revoked"
         )
 
     user = await is_user_member_of_project(
@@ -238,7 +249,7 @@ async def join_to_project(
     )
     await add_member_to_project(db, member_schema)
 
-    await delete_invitation_token(db, token)
+    await revoke_invitation_token(db, token)
 
     await invalidate_user_projects_cache(current_user.id)
 
@@ -554,7 +565,7 @@ async def invite_users_to_project_service(
         if has_invite:
             user_invite_token = await get_user_invite_token(db, user_target.id)
 
-            await delete_invite_token_by_obj(db, user_invite_token)
+            await revoke_invitation_token(db, user_invite_token)
 
     for email in unique_emails:
         user_target = await get_user_by_email(db, email)

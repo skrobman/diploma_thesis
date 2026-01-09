@@ -68,3 +68,12 @@ async def delete_invite_token_by_obj(
     except Exception as e:
         await db.rollback()
         raise e
+
+async def revoke_invitation_token(
+    db: AsyncSession,
+    token: ProjectInvitationTokens
+) -> ProjectInvitationTokens:
+    token.is_revoked = True
+    await db.commit()
+    await db.refresh(token)
+    return token
