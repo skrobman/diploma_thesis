@@ -172,6 +172,7 @@ async def create_task_service(
     creator = await db.get(User, task.created_by)
 
     return ReadCreatedTask(
+        task_id=task.id,
         project_id=task.project_id,
         name=task.name,
         description=task.description,

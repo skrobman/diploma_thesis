@@ -120,6 +120,7 @@ class CalendarTasksRead(BaseModel):
         return self
 
 class ReadCreatedTask(BaseModel):
+    task_id: int
     project_id: int
     name: str
     description: str = None
