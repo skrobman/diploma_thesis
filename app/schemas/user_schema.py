@@ -28,6 +28,9 @@ class ProfileRead(BaseModel):
 class ChangeUsername(BaseModel):
     name: str | None = None
     surname: str | None = None
+class ChangePasswordScheme(BaseModel):
+    old_password: str
+    new_password: str
 
 class UserLoginScheme(BaseModel):
     email: EmailStr
@@ -35,10 +38,6 @@ class UserLoginScheme(BaseModel):
 
 class ForgotPasswordScheme(BaseModel):
     email: EmailStr
-
-class ChangePasswordScheme(BaseModel):
-    old_password: str
-    new_password: str
 
 class ResetPasswordByTokenScheme(BaseModel):
     token: str
