@@ -1,0 +1,23 @@
+name: DAST - ZAP API Safe Scan
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zap-api-safe:
+    name: Scan FastAPI OpenAPI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run ZAP API Scan in safe mode
+        uses: zaproxy/action-api-scan@v0.10.0
+        with:
+          target: "https://diploma-thesis.onrender.com/openapi.json"
+          format: openapi
+          cmd_options: "-S -I"
+          fail_action: false
+          allow_issue_writing: false
+          artifact_name: zap-api-safe-report
