@@ -1,0 +1,23 @@
+name: DAST - ZAP API Active Scan
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zap-api-active:
+    name: Attack FastAPI API
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run ZAP API Active Scan
+        uses: zaproxy/action-api-scan@v0.10.0
+        with:
+          target: "https://diploma-thesis.onrender.com/openapi.json"
+          format: openapi
+          cmd_options: "-I"
+          fail_action: false
+          allow_issue_writing: false
+          artifact_name: zap-api-active-report
